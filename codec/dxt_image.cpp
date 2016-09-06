@@ -24,6 +24,7 @@
 
 int32_t vErrThreshold;
 
+
 template <typename T>
 static inline T AbsDiff(T a, T b) {
   return a > b ? a - b : b - a;
@@ -617,8 +618,8 @@ int DXTImage::IntraSearch(int32_t block_idx, int32_t &min_err_x, int32_t &min_er
 
   int32_t search_space, offset;
 
-  search_space = 16;
-  offset = 64;
+  offset_x = 16;
+  offset_y = 32;
   int32_t block_x  = block_idx % _blocks_width;
   int32_t block_y = block_idx / _blocks_width;
 
@@ -630,8 +631,8 @@ int DXTImage::IntraSearch(int32_t block_idx, int32_t &min_err_x, int32_t &min_er
   int min_err = std::numeric_limits<int>::max();
   bool reset_endpoints = false;
 
-  for(int32_t j = block_y; j >= block_y - search_space; j--) {
-    for(int32_t i = block_x + (search_space - 1); i >= block_x - search_space; i--) {
+  for(int32_t j = block_y; j >= block_y - 2 * _search_area + 1; j--) {
+    for(int32_t i = block_x + (_search_area - 1); i >= block_x - _search_area; i--) {
       if( (i >= _blocks_width || j >= _blocks_height || j < 0 || i < 0) || 
 	                (j == block_y && i >= block_x)) continue;
 
@@ -659,7 +660,7 @@ int DXTImage::IntraSearch(int32_t block_idx, int32_t &min_err_x, int32_t &min_er
       int err_diff = err - orig_err;
       if(err_diff < min_err) {
         min_err = err_diff;
-        min_err_x = 4*(i - block_x) + offset; min_err_y = 4*(j - block_y) +offset;
+        min_err_x = (i - block_x) + offset_x; min_err_y = (j - block_y) + offset_y;
 	index = indices;
 	re_assigned = reset_endpoints;
         if(err_diff <= 0) {
@@ -679,6 +680,8 @@ int DXTImage::InterBlockSearch(std::unique_ptr<DXTImage> &reference, int32_t blo
 
   int32_t block_x = block_idx % _blocks_width;
   int32_t block_y = block_idx / _blocks_width;
+  int32_t search_space = 16;
+  int32_t offset = 16;
   assert(block_x < _blocks_width && block_y < _blocks_height);
 
   blk._logical = _logical_blocks[block_idx];
@@ -687,8 +690,8 @@ int DXTImage::InterBlockSearch(std::unique_ptr<DXTImage> &reference, int32_t blo
   const int orig_err = static_cast<int>(blk.Error());
   int min_err = std::numeric_limits<int>::max();
   bool reset_endpoints = false;
-  for(int32_t j = block_y - 16; j < block_y + 16; j++) {
-    for(int32_t i = block_x - 16; i < block_x + 16; i++) {
+  for(int32_t j = block_y - _search_area; j < block_y + _search_area; j++) {
+    for(int32_t i = block_x - _search_area; i < block_x + _search_area; i++) {
 
       reset_endpoints = false;
       if(i >= _blocks_width || j >= _blocks_height || j < 0 || i < 0) continue;
@@ -717,7 +720,7 @@ int DXTImage::InterBlockSearch(std::unique_ptr<DXTImage> &reference, int32_t blo
       int err_diff = err - orig_err;
       if(err_diff < min_err) {
         min_err = err_diff;
-	min_err_x = 4*(i - block_x) + 64; min_err_y = 4*(j - block_y) + 64;
+	min_err_x = (i - block_x) + offset; min_err_y = (j - block_y) + offset;
 	index = indices;
 	re_assigned = reset_endpoints;
         if(err_diff <= 0) {
@@ -853,28 +856,28 @@ void DXTImage::Reencode(std::unique_ptr<DXTImage> &reference, int ref_number) {
       continue;
     }
 
-    if(!_is_intra) {
-      re_assigned = false;
-      err_inter_pixel = 
-	InterPixelSearch(reference, physical_idx, min_err_x, min_err_y, ref_number, min_interp,
-	                 blk, re_assigned);
-      if(err_inter_pixel <= vErrThreshold) {
-	_found[physical_idx] = true;
-	std::tuple<uint8_t, uint8_t> motion_idx(static_cast<uint8_t>(min_err_x), static_cast<uint8_t>(min_err_y));
-        _inter_pixel_motion_indices.push_back(motion_idx);
-	_motion_indices.push_back(motion_idx);
-	_index_mask[physical_idx] = 0;
+/*    if(!_is_intra) {*/
+      //re_assigned = false;
+      //err_inter_pixel = 
+	//InterPixelSearch(reference, physical_idx, min_err_x, min_err_y, ref_number, min_interp,
+			 //blk, re_assigned);
+      //if(err_inter_pixel <= vErrThreshold) {
+	//_found[physical_idx] = true;
+	//std::tuple<uint8_t, uint8_t> motion_idx(static_cast<uint8_t>(min_err_x), static_cast<uint8_t>(min_err_y));
+        //_inter_pixel_motion_indices.push_back(motion_idx);
+	//_motion_indices.push_back(motion_idx);
+	//_index_mask[physical_idx] = 0;
 
-	//Re-assign Indices
-        blk.AssignIndices(min_interp);
-	if(re_assigned)
-	  blk.RecalculateEndpoints();
+	////Re-assign Indices
+        //blk.AssignIndices(min_interp);
+	//if(re_assigned)
+	  //blk.RecalculateEndpoints();
 
-	_logical_blocks[physical_idx] = blk._logical;
-	_physical_blocks[physical_idx] = LogicalToPhysical(blk._logical);
-	continue;
-      }
-    }
+	//_logical_blocks[physical_idx] = blk._logical;
+	//_physical_blocks[physical_idx] = LogicalToPhysical(blk._logical);
+	//continue;
+      //}
+    //}
  
     _index_mask[physical_idx] = 1;
     _unique_palette.push_back(_physical_blocks[physical_idx].interp);
@@ -882,7 +885,6 @@ void DXTImage::Reencode(std::unique_ptr<DXTImage> &reference, int ref_number) {
     _global_palette_dict.insert(_physical_blocks[physical_idx].interp);
     
   }
-
 }
 
 uint32_t DXTImage::Error(std::unique_ptr<DXTImage> &other) {

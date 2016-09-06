@@ -3,6 +3,7 @@
 #include "dxt_image.h"
 #include "arithmetic_codec.h"
 #include "stb_image_write.h"
+#include "utils.h"
 
 #include <dirent.h>
 #include <fstream>
@@ -18,19 +19,35 @@ const uint32_t max_bytes = 1048576; // 1MB
 
 void MeasureEntropy(std::vector<uint8_t> &symbols) {
 }
+
 //Entropy Encode a bunch of symbols 
-void EntropyEncode(std::vector<uint8_t> &symbols, std::vector<uint8_t> &out_data) {
-  out_data.resize(max_bytes, 0);
-  entropy::Arithmetic_Codec arith_data_encoder(max_bytes, symbols.data());
-  entropy::Adaptive_Data_Model data_model(257);
-  arith_data_encoder.start_encoder();
-  for(auto a: symbols) {
-    arith_data_encoder.encode(a, data_model);
+void EntropyEncode(std::vector<uint8_t> &symbols, std::vector<uint8_t> &out_data, 
+                   bool is_bit_model) {
+  std::vector<uint8_t> temp_out_data;
+  temp_out_data.resize(max_bytes, 0);
+  entropy::Arithmetic_Codec arith_data_encoder(max_bytes, temp_out_data.data());
+  if(!is_bit_model) {
+    entropy::Adaptive_Data_Model data_model(257);
+    arith_data_encoder.start_encoder();
+    for(auto a: symbols) {
+      arith_data_encoder.encode(a, data_model);
+    }
+    arith_data_encoder.stop_encoder();
+    uint32_t compressed_size = arith_data_encoder.get_num_bytes();
+    out_data.resize(out_data.size() + compressed_size);
+    memcpy(out_data.data()+(out_data.size()-compressed_size), temp_out_data.data(), compressed_size);
   }
-  arith_data_encoder.stop_encoder();
-  uint32_t compressed_size = arith_data_encoder.get_num_bytes();
-  out_data.resize(compressed_size);
-  out_data.shrink_to_fit();
+  else {
+    entropy::Adaptive_Bit_Model data_model;
+    arith_data_encoder.start_encoder();
+    for(auto a: symbols) {
+      arith_data_encoder.encode(a, data_model);
+    }
+    arith_data_encoder.stop_encoder();
+    uint32_t compressed_size = arith_data_encoder.get_num_bytes();
+    out_data.resize(out_data.size() + compressed_size);
+    memcpy(out_data.data()+(out_data.size() - compressed_size), temp_out_data.data(), compressed_size);
+  }
 }
 
 //Entropy Encode different symbols in DXTImage Reencoded class and return the data
@@ -70,11 +87,6 @@ void EntropyEncode(std::unique_ptr<MPTC::DXTImage> &dxt_frame, std::vector<uint8
 #ifndef NDEBUG
   std::cout << "Total bytes: " << total_bytes << std::endl;
 #endif
-  double bpp;
-  bpp = static_cast<double>(total_bytes * 8) / (dxt_frame->_width * dxt_frame->_height);
-#ifndef NDEBUG
-  std::cout << "bpp: " << bpp << std::endl;
-#endif
   //copy data to out_data
   //0.intra or inter
    out_data.resize(out_data.size() + 1, 0);
@@ -95,11 +107,11 @@ void EntropyEncode(std::unique_ptr<MPTC::DXTImage> &dxt_frame, std::vector<uint8
    //5.mask data
   out_data.resize(out_data.size() + mask_bytes, 0);
   memcpy(out_data.data() + (out_data.size() - mask_bytes) , compressed_index_mask.data(), mask_bytes);
-  
+#ifdef UNIQUE  
   // copy unique_indices values
   out_data.resize(out_data.size() + num_unique * 4, 0);
   memcpy(out_data.data() + (out_data.size() - num_unique * 4), dxt_frame->_unique_palette.data(), num_unique * 4);
-
+#endif
   
   //6.compressed motion_index data
   out_data.resize(out_data.size() + indices_bytes, 0);
@@ -191,7 +203,7 @@ void CompressPNGStream(const std::string dir_name, const std::string out_file, u
   std::cout << "Compressed palette size:" << compressed_palette_8bit.size() << std::endl;
 #endif
 
-  uint32_t curr_num = 0;
+  uint32_t curr_num = 2;
   bool set_intra = false;
   //Entropy Encode
   EntropyEncode(first_frame, out_data);
@@ -213,15 +225,6 @@ void CompressPNGStream(const std::string dir_name, const std::string out_file, u
     curr_file.clear();
     out_data.clear();
     curr_file = dir_name + "/" + a;
-    if(curr_num > interval){
-      set_intra = true;
-      curr_num = 0;
-    }
-    else { 
-      set_intra = false;
-      curr_num++;
-    }
-
     // ******Decide intra or inter here...*********
     curr_frame.reset(new MPTC::DXTImage(curr_file, set_intra, search_area, vErrThreshold));
     std::cout << "Frame Name: " << a << std::endl;
@@ -260,23 +263,30 @@ void CompressPNGStream(const std::string dir_name, const std::string out_file, u
     std::cout << "BPP: " << bpp << std::endl;
     std::cout << std::endl << std::endl;
 #endif
+    if(curr_num > interval){
+      set_intra = true;
+      curr_num = 1;
 #ifdef COMBINEPALETTE
-    if(--curr_num > interval) {
       std::vector<uint8_t> compressed_combined_8bit_palette;
-      EntropyEncode(combined_8bit_palette, compressed_combined_8bit_palette);
+      EntropyEncode(combined_8bit_palette, compressed_combined_8bit_palette, false);
       std::cout << std::endl;
       std::cout << "------------------------------" << std::endl;
       std::cout << "Uncompressed combined Palette:" << combined_8bit_palette.size() << std::endl;
       std::cout << "Compressed combined Palette:" << compressed_combined_8bit_palette.size() << std::endl;
       std::cout << "-----------------------------" << std::endl;
-      
       combined_8bit_palette.clear();
+#endif
+
     }
-    else {
+    else { 
+      set_intra = false;
+      curr_num++;
+#ifdef COMBINEPALETTE
       std::vector<uint8_t> temp_palette_8bit = curr_frame->Get8BitPalette();
       combined_8bit_palette.insert(std::end(combined_8bit_palette), std::begin(temp_palette_8bit), std::end(temp_palette_8bit));
-    }
-#endif 
+#endif
+   }
+
     prev_frame = std::move(curr_frame);
   }
   out_stream.close();
@@ -308,7 +318,7 @@ void ReconstructInterpolationData(std::vector<uint32_t> &unique_indices,
       uint8_t x = std::get<0>(motion_indices[final_idx]);
       uint8_t y = std::get<1>(motion_indices[final_idx]);
 
-      if( (x%4!=0) || (y%4!=0) ) { // if this conditon holds inter-pixel motion. fetch data from previous frame
+      if((x&3)!=0 || (y&3)!=0) { // if this conditon holds inter-pixel motion. fetch data from previous frame
         int32_t motion_x = static_cast<int32_t>(x - 64);
 	int32_t motion_y = static_cast<int32_t>(y - 64);
 
@@ -386,6 +396,249 @@ void EntropyDecode(std::vector<uint8_t> &compressed_data, std::vector<uint8_t> &
   }
   return;
 }
+
+void FastDecompressMultiUnique(const std::string input_file, const std::string out_dir) {
+  // Minimize memory copies 
+  // Remove all unnecessary copies
+  // Load all the data required for the frame in one go and off set everything from it
+  // Change the Entropy Decode function to work that way
+  // Get a better entropy decoder and encoder
+
+  std::ifstream in_stream;
+  in_stream.open(input_file.c_str(), std::ifstream::binary);
+  if(!in_stream.is_open()) {
+    std::cerr << "Error opening file!" << std::endl;
+    exit(-1);
+  }
+  uint32_t frame_height, frame_widht, total_frame_count;
+  uint8_t unique_interval;
+  in_stream.read(reinterpret_cast<char*>(&frame_height), 4);
+
+}
+void DecompressMultiUnique(const std::string input_file, const std::string out_dir) {
+
+  std::ifstream in_stream;
+  in_stream.open(input_file.c_str(), std::ifstream::binary);
+
+  if(!in_stream.is_open()) {
+    std::cerr << "Error opening file!" << std::endl;
+    exit(-1);
+  }
+  uint32_t frame_height, frame_width, total_frame_count;
+  uint8_t unique_interval;
+  in_stream.read(reinterpret_cast<char*>(&frame_height), 4);
+  in_stream.read(reinterpret_cast<char*>(&frame_width), 4);
+  uint32_t num_blocks = (frame_height/4 * frame_width/4);
+  in_stream.read(reinterpret_cast<char*>(&unique_interval), 1);
+  in_stream.read(reinterpret_cast<char*>(&total_frame_count), 4);
+  std::unique_ptr<DXTImage> null_dxt(nullptr);
+  std::unique_ptr<DXTImage> prev_frame(nullptr), curr_frame(nullptr), first_frame(nullptr);
+  uint32_t frame_number = 0;
+  std::vector<uint8_t> compressed_combined_palette;
+  for(uint32_t curr_frame_idx = 0; curr_frame_idx < total_frame_count; curr_frame_idx++){
+    compressed_combined_palette.clear();
+    uint32_t compressed_palette_size, unique_count, unique_idx_offset = 0;
+    in_stream.read(reinterpret_cast<char*>(&compressed_palette_size), 4);
+    compressed_combined_palette.resize(compressed_palette_size);
+    in_stream.read(reinterpret_cast<char*>(compressed_combined_palette.data()), compressed_palette_size);
+    in_stream.read(reinterpret_cast<char*>(&unique_count), 4);
+    std::vector<uint8_t> combined_8bit_palette(unique_count);
+    EntropyDecode(compressed_combined_palette, combined_8bit_palette, false);
+     
+    for(uint8_t curr_idx = 0; curr_idx < unique_interval; curr_idx++) {
+      uint8_t intra;
+      frame_number++;
+      in_stream.read(reinterpret_cast<char*>(&intra), 1);
+      bool is_intra = static_cast<bool>(intra);
+      // read 4 bytes which give total unique indices count
+      uint32_t num_unique;
+      in_stream.read(reinterpret_cast<char*>(&num_unique), 4);
+      // read 4 bytes which give size of compressed mask bytes
+      uint32_t mask_bytes;
+      in_stream.read(reinterpret_cast<char*>(&mask_bytes), 4);
+      // read 4 bytes which give size of compressed motion indices
+      uint32_t indices_bytes;
+      in_stream.read(reinterpret_cast<char*>(&indices_bytes), 4);
+      // allocate memory for mask bytes and read mask bytes
+     std::vector<uint8_t> compressed_index_mask(mask_bytes, 0);
+     in_stream.read(reinterpret_cast<char*>(compressed_index_mask.data()), mask_bytes);
+     // allocate memory for unique indices values and read unique indices bytes
+     std::vector<uint32_t> unique_indices(num_unique, 0);
+     memcpy(unique_indices.data(), combined_8bit_palette.data() + unique_idx_offset, 4 * num_unique);
+     unique_idx_offset += 4*num_unique;
+     // allocate memory for motion_index data and read compressed motion indices
+     std::vector<uint8_t> compressed_motion_indices(indices_bytes, 0);
+     in_stream.read(reinterpret_cast<char*>(compressed_motion_indices.data()), indices_bytes);
+
+     //Decompress the mask bytes using arithmetic decoder
+     std::vector<uint8_t> out_mask_bits(num_blocks,0);
+     EntropyDecode(compressed_index_mask, out_mask_bits, true);
+
+
+     //Decompress the motion indices uisng arithmetic decoder
+     uint32_t num_motion_indices = (num_blocks - num_unique);
+     std::vector<uint8_t> motion_indices(2 * num_motion_indices, 0);
+     EntropyDecode(compressed_motion_indices, motion_indices, false);
+     std::vector< std::tuple<uint8_t, uint8_t> > out_motion_indices;
+
+     for(size_t ii = 0; ii < motion_indices.size(); ii+=2) 
+      out_motion_indices.push_back(std::make_tuple(motion_indices[ii], motion_indices[ii + 1]));
+    
+    // Populate the physical and logical blocks using the data
+    curr_frame.reset(new DXTImage(frame_width, frame_height, is_intra, unique_indices));
+    ReconstructInterpolationData(unique_indices, out_motion_indices,
+			       out_mask_bits, curr_frame, prev_frame);
+    curr_frame->SetLogicalBlocks(); 
+    std::string out_frame = out_dir + "/" + std::to_string(frame_number);
+#ifndef NDEBUG  
+    std::unique_ptr<GreyImage> recons_image = std::move(curr_frame->InterpolationImage());  
+    stbi_write_png(out_frame.c_str(), recons_image->Width(), recons_image->Height(),
+                   1, recons_image->Pack().data(), recons_image->Width());
+#endif
+    prev_frame = std::move(curr_frame);
+
+    }
+  }
+  in_stream.close();
+}
+
+void CompressMultiUnique(const std::string dir_name, const std::string out_file, 
+                         uint32_t search_area, int32_t vErrThreshold, uint32_t intra_interval, 
+			 uint32_t unique_interval, std::string ep_dir) {
+
+  DIR *dir = opendir(dir_name.c_str());
+  if (!dir) {
+    std::cerr<< "Error opening directory: " << dir_name << std::endl;
+    exit(-1);
+  }
+
+  std::string first_file, curr_file, prev_file;
+  struct dirent *entry = NULL;
+  uint32_t frame_number = 0; 
+  // skip '.' and '..' 
+  std::vector<std::string> file_names;
+  while ((entry = readdir(dir)) != NULL) {
+    if (strlen(entry->d_name) == 1 && strncmp(entry->d_name, ".", 1) == 0) continue;
+    else if (strlen(entry->d_name) == 2 && strncmp(entry->d_name, "..", 2) == 0) continue;
+    else file_names.push_back(entry->d_name);
+  }
+  std::sort(file_names.begin(), file_names.end());
+
+  uint32_t curr_intra_num = 1, curr_unique_num = 1;
+#ifndef NDEBUG
+  for(auto a : file_names)
+    std::cout << a << std::endl;
+#endif
+  // read the first file name
+  //entry = readdir(dir);
+
+  std::unique_ptr<MPTC::DXTImage> null_dxt(nullptr);
+  std::unique_ptr<MPTC::DXTImage> curr_frame(nullptr), prev_frame(nullptr);
+
+  curr_file = dir_name + "/" + file_names[0];
+  std::unique_ptr<MPTC::DXTImage> first_frame(new MPTC::DXTImage(curr_file, true, search_area, vErrThreshold));
+  curr_file.clear();
+  uint32_t frame_count = 1;
+  uint32_t frame_height, frame_width, unique_count = 0;
+  frame_width = first_frame->Width();
+  frame_height = first_frame->Height();
+
+  //open out file for writing to it
+  std::ofstream out_stream(out_file.c_str(), std::ofstream::binary);
+  // Write out frame height and frame width
+  // Write the ---unique interval value--- 
+  uint8_t unique_int = static_cast<uint8_t>(unique_interval);
+  uint32_t total_frame_count = file_names.size() / unique_interval;
+  out_stream.write(reinterpret_cast<const char*>(&frame_height), 4);
+  out_stream.write(reinterpret_cast<const char*>(&frame_width), 4);
+  out_stream.write(reinterpret_cast<const char*>(&unique_int), 1);
+  out_stream.write(reinterpret_cast<const char*>(&total_frame_count), 4);
+  out_stream.flush();
+
+  // out_data to be written to file
+  std::vector<uint8_t> out_data;
+  // copyt height and widht 
+  // copy the size of the mask index
+  // copy mask index data
+  // copy size of of motion indices
+  // copy unique_indices
+  // copy data of motion indices
+  bool set_intra = true;
+  std::vector<uint8_t> combined_8bit_palette;
+  std::vector<uint8_t> combined_motion_data;
+  std::vector<uint8_t> compressed_combined_motion_data;
+  for(auto a : file_names) {
+    frame_number++;
+    curr_file.clear();
+    curr_file = dir_name + "/" + a;
+
+    curr_frame.reset(new DXTImage(curr_file, set_intra, search_area, vErrThreshold));
+    std::cout << "Frame Name:" << a << std::endl;
+#ifndef NDEBUG
+    std::cout << "PSNR before reencoding: " << curr_frame->PSNR() << std::endl;
+#endif  
+    curr_frame->Reencode(prev_frame, -1);
+#ifndef NDEBUG
+    std::cout << "PSNR after reencoding: " << curr_frame->PSNR() << std::endl;
+    std::cout << "Total blocks found: " << curr_frame->_motion_indices.size() << std::endl;
+    std::cout << "Inter pixel blocks:" << curr_frame->_inter_pixel_motion_indices.size() << std::endl;
+#endif 
+#ifdef ENDPOINTIMG
+    std::string ep_file;
+    ep_file.clear();
+    ep_file = ep_dir + "/" + a + "_ep1.png";
+    std::unique_ptr<RGBImage> ep1_ptr = std::move(curr_frame->EndpointOneImage());
+    stbi_write_png(ep_file.c_str(), ep1_ptr->Width(), ep1_ptr->Height(), 
+                  3, ep1_ptr->Pack().data(), 3 * ep1_ptr->Width());    
+#endif 
+    EntropyEncode(curr_frame, compressed_combined_motion_data); 
+    if(curr_intra_num <= intra_interval){
+      set_intra = false;
+      if(curr_intra_num == intra_interval) {
+	set_intra = true;
+	curr_intra_num = 1;
+      }
+      else curr_intra_num++;
+   }
+   
+   if(curr_unique_num <= unique_interval) {
+
+     std::vector<uint8_t> temp_palette_8bit = curr_frame->Get8BitPalette();
+     combined_8bit_palette.insert(std::end(combined_8bit_palette), std::begin(temp_palette_8bit), std::end(temp_palette_8bit));
+     unique_count += static_cast<uint32_t>(temp_palette_8bit.size());
+
+     if(curr_unique_num == unique_interval) {
+       std::vector<uint8_t> compressed_combined_8bit_palette;
+       EntropyEncode(combined_8bit_palette, compressed_combined_8bit_palette, false);
+#ifndef NDEBUG
+       std::cout << "--------------------------" << std::endl;
+       std::cout << "Uncompressed combined Palette:" << combined_8bit_palette.size() << std::endl;
+       std::cout << "Compressed combined Palette:" << compressed_combined_8bit_palette.size() << std::endl;
+       std::cout << "-------------------------" << std::endl;
+#endif
+       uint32_t compressed_palette_size = compressed_combined_8bit_palette.size();
+       out_stream.write(reinterpret_cast<const char*>(&compressed_palette_size), 4);
+       out_stream.write(reinterpret_cast<const char*>(compressed_combined_8bit_palette.data()), compressed_combined_8bit_palette.size());
+       out_stream.write(reinterpret_cast<const char*>(&unique_count), 4);
+       out_stream.write(reinterpret_cast<const char*>(compressed_combined_motion_data.data()), compressed_combined_motion_data.size());
+       out_stream.flush();
+       compressed_combined_motion_data.clear();
+       compressed_combined_8bit_palette.clear(); 
+       combined_8bit_palette.clear();
+       unique_count = 0;
+       curr_unique_num = 1;
+     }
+     else curr_unique_num++;
+
+   }
+    prev_frame = std::move(curr_frame);
+  }
+#ifndef NDEBUG
+  std::cout << "Number of total bytes written:" << out_stream.tellp() << std::endl;
+#endif 
+  out_stream.close();
+}
+
 
 void DecompressMPTCStream(const std::string input_file, const std::string out_dir, uint32_t interval) {
   //open the file

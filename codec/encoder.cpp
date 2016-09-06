@@ -455,24 +455,28 @@ int main( int argc, char* argv[]) {
 
 int main(int argc, char *argv[]) {
   // Have to change this to only encoder
-  if(argc < 6) {
+  if(argc < 7) {
     std::cout<< "All File arguments are required!!" << std::endl;
     exit(-1);
   }
+  uint32_t search_area = std::stoi(argv[1], nullptr, 10);
+  int32_t intra_interval = std::stoi(argv[2], nullptr, 10);
+  uint32_t unique_interval = std::stoi(argv[3], nullptr, 10);
+  int32_t vErrThreshold = std::stoi(argv[4], nullptr, 10);
 
-  std::string dir_path(argv[1]);
-  std::string out_file_path(argv[2]);
-  uint32_t search_area = std::stoi(argv[3], nullptr, 10);
-  int32_t interval = std::stoi(argv[4], nullptr, 10);
-  int32_t vErrThreshold = std::stoi(argv[5], nullptr, 10);
-  std::string out_dir(argv[6]);
+  std::string dir_path(argv[5]);
+  std::string out_file_path(argv[6]);
+  std::string out_dir(argv[7]);
   std::string ep_dir;
-  if(argc > 6)
-   ep_dir = std::string(argv[7]);
+  if(argc > 7)
+   ep_dir = std::string(argv[8]);
   
-  MPTC::CompressPNGStream(dir_path, out_file_path, search_area, vErrThreshold, interval, ep_dir);
+  //MPTC::CompressPNGStream(dir_path, out_file_path, search_area, vErrThreshold, interval, ep_dir);
   
   //MPTC::DecompressMPTCStream(out_file_path, out_dir, interval);
+  MPTC::CompressMultiUnique(dir_path, out_file_path, search_area, vErrThreshold, 
+                            intra_interval, unique_interval, ep_dir);
+//  MPTC::DecompressMultiUnique(out_file_path, out_dir);
   
   return 0;
 }
