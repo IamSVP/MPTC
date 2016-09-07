@@ -613,12 +613,11 @@ std::vector<uint8_t> DXTImage::Get4X4ColorsBlock(uint32_t i, uint32_t j) {
 }
 
 int DXTImage::IntraSearch(int32_t block_idx, int32_t &min_err_x, int32_t &min_err_y, 
-                          uint32_t &index, CompressedBlock &blk, bool &re_assigned) {
+                          uint32_t &index, CompressedBlock &blk, bool &re_assigned, uint8_t search_space) {
 
-  int32_t search_space, offset;
+  int32_t offset;
 
-  search_space = 16;
-  offset = 64;
+  offset = 4 * search_space;
   int32_t block_x  = block_idx % _blocks_width;
   int32_t block_y = block_idx / _blocks_width;
 
@@ -630,7 +629,7 @@ int DXTImage::IntraSearch(int32_t block_idx, int32_t &min_err_x, int32_t &min_er
   int min_err = std::numeric_limits<int>::max();
   bool reset_endpoints = false;
 
-  for(int32_t j = block_y; j >= block_y - search_space; j--) {
+  for(int32_t j = block_y; j >= block_y - 2*search_space; j--) {
     for(int32_t i = block_x + (search_space - 1); i >= block_x - search_space; i--) {
       if( (i >= _blocks_width || j >= _blocks_height || j < 0 || i < 0) || 
 	                (j == block_y && i >= block_x)) continue;
@@ -791,6 +790,39 @@ int DXTImage::InterPixelSearch(std::unique_ptr<DXTImage> &reference, int32_t blo
 }
 
 
+void DXTImage::ReencodeAndAnalyze(std::unique_ptr<DXTImage> &reference, int ref_number, std::vector<std::tuple<uint8_t, uint8_t> > &motion_indices, uint8_t search_space) {
+  for(int32_t physical_idx = 0; physical_idx < static_cast<int32_t>(_physical_blocks.size()); physical_idx++) {
+    int err_inter_pixel, err_inter_block, err_intra;
+    int32_t min_err_x, min_err_y;
+    uint32_t min_interp;
+    CompressedBlock blk;
+    bool re_assigned;
+
+   re_assigned = false;
+    err_intra = 
+      IntraSearch(physical_idx, min_err_x, min_err_y, min_interp, blk, re_assigned, search_space);
+    if(err_intra <= vErrThreshold) {
+      _found[physical_idx] = true;
+      std::tuple<uint8_t, uint8_t> motion_idx(static_cast<uint8_t>(min_err_x), static_cast<uint8_t>(min_err_y));
+      _intra_motion_indices.push_back(motion_idx);
+      _motion_indices.push_back(motion_idx);
+      motion_indices.push_back(motion_idx);
+      _index_mask[physical_idx] = 0;
+      //Re-assign Indices
+      blk.AssignIndices(min_interp);
+      if(re_assigned)
+        blk.RecalculateEndpoints();
+      _logical_blocks[physical_idx] = blk._logical;
+      _physical_blocks[physical_idx] = LogicalToPhysical(blk._logical);
+      continue;
+    }
+    _index_mask[physical_idx] = 1;
+    _unique_palette.push_back(_physical_blocks[physical_idx].interp);
+    _global_palette.push_back(std::make_tuple(_physical_blocks[physical_idx].interp, physical_idx));
+    _global_palette_dict.insert(_physical_blocks[physical_idx].interp);
+  }
+}
+
 void DXTImage::Reencode(std::unique_ptr<DXTImage> &reference, int ref_number) {
   // add check for reference NULL!!!
   // 0 - unique indices
@@ -837,7 +869,7 @@ void DXTImage::Reencode(std::unique_ptr<DXTImage> &reference, int ref_number) {
 
    re_assigned = false;
     err_intra = 
-      IntraSearch(physical_idx, min_err_x, min_err_y, min_interp, blk, re_assigned);
+      IntraSearch(physical_idx, min_err_x, min_err_y, min_interp, blk, re_assigned, 16);
     if(err_intra <= vErrThreshold) {
       _found[physical_idx] = true;
       std::tuple<uint8_t, uint8_t> motion_idx(static_cast<uint8_t>(min_err_x), static_cast<uint8_t>(min_err_y));

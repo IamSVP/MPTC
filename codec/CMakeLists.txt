@@ -19,4 +19,6 @@ set( SOURCES
 add_library(mptc_codec ${HEADERS} ${SOURCES})
 target_link_libraries(mptc_codec arith_codec)
 add_executable(mptc_encoder encoder.cpp)
+add_executable(prob_dist prob_dist.cpp)
 target_link_libraries(mptc_encoder mptc_codec arith_codec)
+target_link_libraries(prob_dist mptc_codec arith_codec)

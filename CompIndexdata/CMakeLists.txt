@@ -5,10 +5,8 @@
 # Target Link libraries, add libraries on which this is depended on 
 
 INCLUDE_DIRECTORIES("${MPTC_SOURCE_DIR}/Include")
-FIND_PACKAGE(OpenCV REQUIRED)
 set( SOURCES "main.cpp")
 
 ADD_EXECUTABLE( mptc_index ${SOURCES})
-TARGET_LINK_LIBRARIES(mptc_index ${OpenCV_LIBS})
 TARGET_LINK_LIBRARIES(mptc_index squish)
 
