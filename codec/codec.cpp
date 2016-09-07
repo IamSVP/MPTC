@@ -9,6 +9,8 @@
 #include <fstream>
 #include <tuple>
 #include <algorithm>
+#include <vector>
+#include <cmath>
 
 //#define PALETTECOMP
 //#define ENDPOINTIMG
@@ -17,7 +19,19 @@ namespace MPTC {
 
 const uint32_t max_bytes = 1048576; // 1MB 
 
-void MeasureEntropy(std::vector<uint8_t> &symbols) {
+double MeasureEntropy(std::vector<uint8_t> &symbols) {
+  std::vector<uint64_t> counts(257,0);
+  for(auto a : symbols)
+    counts[a]++;
+  uint64_t total = std::accumulate(counts.begin(), counts.end(), 0);
+  double entropy = 0.0;
+  for(auto count : counts){
+    if(count != 0) {
+      double p = static_cast<double>(count) / static_cast<double>(total);
+      entropy += (-1.0 * p * log2(p));
+    }
+  }
+  return entropy;
 }
 
 //Entropy Encode a bunch of symbols 
@@ -59,6 +73,7 @@ void EntropyEncode(std::unique_ptr<MPTC::DXTImage> &dxt_frame, std::vector<uint8
   entropy::Arithmetic_Codec arith_data_encoder(max_bytes, compressed_motion_indices.data()); 
   entropy::Adaptive_Data_Model data_model(257);
   arith_data_encoder.start_encoder();
+  assert(dxt_frame->_motion_indices.size() == dxt_frame->_num_blocks);
   for(auto a : dxt_frame->_motion_indices) {
     arith_data_encoder.encode(std::get<0>(a), data_model);
     arith_data_encoder.encode(std::get<1>(a), data_model);
@@ -70,43 +85,31 @@ void EntropyEncode(std::unique_ptr<MPTC::DXTImage> &dxt_frame, std::vector<uint8
   std::cout << "compressed motion indices size: " << indices_bytes << std::endl;
 #endif
   //Encode the index mask
-  std::vector<uint8_t> compressed_index_mask(max_bytes, 0);
-  entropy::Arithmetic_Codec arith_bit_encoder(max_bytes, compressed_index_mask.data());
-  entropy::Adaptive_Bit_Model bit_model;
-  arith_bit_encoder.start_encoder();
-  for(auto a : dxt_frame->_index_mask) {
-    arith_bit_encoder.encode(a, bit_model);
-  }
-  arith_bit_encoder.stop_encoder();
-  mask_bytes = arith_bit_encoder.get_num_bytes();
+  //*****NO MORE MASK*****// 
+/*  std::vector<uint8_t> compressed_index_mask(max_bytes, 0);*/
+  //entropy::Arithmetic_Codec arith_bit_encoder(max_bytes, compressed_index_mask.data());
+  //entropy::Adaptive_Bit_Model bit_model;
+  //arith_bit_encoder.start_encoder();
+  //for(auto a : dxt_frame->_index_mask) {
+    //arith_bit_encoder.encode(a, bit_model);
+  //}
+  //arith_bit_encoder.stop_encoder();
+  /*mask_bytes = arith_bit_encoder.get_num_bytes();*/
 
-#ifndef NDEBUG  
-  std::cout << "Compressed index mask size: " << mask_bytes << std::endl;
-#endif
-  total_bytes = dxt_frame->_unique_palette.size() * 4 + mask_bytes + indices_bytes;
+  total_bytes = dxt_frame->_unique_palette.size() * 4 + indices_bytes;
 #ifndef NDEBUG
   std::cout << "Total bytes: " << total_bytes << std::endl;
 #endif
   //copy data to out_data
-  //0.intra or inter
-   out_data.resize(out_data.size() + 1, 0);
-   memcpy(out_data.data() + (out_data.size() - 1), reinterpret_cast<uint8_t*>(&dxt_frame->_is_intra), 1);
   //1.size of unique indices
   uint32_t num_unique = dxt_frame->_unique_palette.size();
   out_data.resize(out_data.size() + 4, 0);
   memcpy(out_data.data()+(out_data.size()-4), reinterpret_cast<uint8_t*>(&num_unique), 4);
   
-  //2.size of compressed mask indices
-  out_data.resize(out_data.size() + 4, 0);
-  memcpy(out_data.data() +(out_data.size() - 4), reinterpret_cast<uint8_t*>(&mask_bytes), 4);
-
   //4.size of compressed motion indices
   out_data.resize(out_data.size() + 4, 0);
   memcpy(out_data.data() + (out_data.size() - 4) , reinterpret_cast<uint8_t*>(&indices_bytes), 4);
 
-   //5.mask data
-  out_data.resize(out_data.size() + mask_bytes, 0);
-  memcpy(out_data.data() + (out_data.size() - mask_bytes) , compressed_index_mask.data(), mask_bytes);
 #ifdef UNIQUE  
   // copy unique_indices values
   out_data.resize(out_data.size() + num_unique * 4, 0);
@@ -297,48 +300,30 @@ void CompressPNGStream(const std::string dir_name, const std::string out_file, u
 //
 void ReconstructInterpolationData(std::vector<uint32_t> &unique_indices,
                                   std::vector<std::tuple<uint8_t ,uint8_t> > &motion_indices,
-                                  std::vector<uint8_t> &index_mask_in,
                                   std::unique_ptr<DXTImage> &curr_frame,
-                                  std::unique_ptr<DXTImage> &prev_frame) {
+                                  std::unique_ptr<DXTImage> &prev_frame, uint8_t search_area) {
 
-  std::vector<int32_t> index_mask(index_mask_in.begin(), index_mask_in.end());
-  for(size_t i = 1; i < index_mask_in.size(); i++) {
-    index_mask[i] += index_mask[i-1];
-  }
 
   std::vector<uint32_t> interpolation_data; 
   int prev_mask_idx = 0; 
   int32_t blocks_width = curr_frame->_blocks_width;
+  uint32_t curr_unique_idx = 0;
   for(int physical_idx = 0; physical_idx < curr_frame->_num_blocks; physical_idx++) {
-    int curr_mask_idx = index_mask[physical_idx];
-    int final_idx;
-    if(prev_mask_idx == curr_mask_idx) {
-      final_idx = physical_idx - curr_mask_idx;
 
-      uint8_t x = std::get<0>(motion_indices[final_idx]);
-      uint8_t y = std::get<1>(motion_indices[final_idx]);
+      uint8_t x = std::get<0>(motion_indices[physical_idx]);
+      uint8_t y = std::get<1>(motion_indices[physical_idx]);
 
-      if((x&3)!=0 || (y&3)!=0) { // if this conditon holds inter-pixel motion. fetch data from previous frame
-        int32_t motion_x = static_cast<int32_t>(x - 64);
-	int32_t motion_y = static_cast<int32_t>(y - 64);
-
-        int32_t curr_block_x = physical_idx % blocks_width;
-        int32_t curr_block_y = physical_idx / blocks_width;
-
-	int32_t pix_x = 4 * curr_block_x + motion_x;
-	int32_t pix_y = 4 * curr_block_y + motion_y;
-
-	uint32_t interpolation = prev_frame->Get4X4InterpolationBlock(
-	                                           static_cast<uint32_t>(pix_x), 
-	                                           static_cast<uint32_t>(pix_y));
-	interpolation_data.push_back(interpolation);
+      if(x == 255 && y == 255) { // if this conditon holds it's a unique idx
+	assert(curr_unique_idx < curr_frame->_unique_palette.size());
+        interpolation_data.push_back(curr_frame->_unique_palette[curr_unique_idx]);
+	curr_unique_idx++;
       } 
       else if((x&0b10000000)!=0 && (y&0b10000000)!=0) { //Inter block motion, fetch data from previous frame
 
         x = (x & 0b01111111);
         y = (y & 0b01111111);
-        int32_t motion_x = static_cast<int32_t>(x - 64)/4;
-        int32_t motion_y = static_cast<int32_t>(y - 64)/4;
+        int32_t motion_x = static_cast<int32_t>(x - search_area);
+        int32_t motion_y = static_cast<int32_t>(y - search_area);
 
         int32_t curr_block_x = physical_idx % blocks_width;
         int32_t curr_block_y = physical_idx / blocks_width;
@@ -351,8 +336,8 @@ void ReconstructInterpolationData(std::vector<uint32_t> &unique_indices,
       }
       else { //Intra block motion, fetch data from own frame
 
-        int32_t motion_x = static_cast<int32_t>(x - 64)/4;
-        int32_t motion_y = static_cast<int32_t>(y - 64)/4;
+        int32_t motion_x = static_cast<int32_t>(x - search_area);
+        int32_t motion_y = static_cast<int32_t>(y - 2 * search_area + 1);
 
         int32_t curr_block_x = physical_idx % blocks_width;
         int32_t curr_block_y = physical_idx / blocks_width;
@@ -361,20 +346,15 @@ void ReconstructInterpolationData(std::vector<uint32_t> &unique_indices,
         int32_t ref_block_y = curr_block_y + motion_y;
 
         int32_t ref_physical_idx = ref_block_y * blocks_width + ref_block_x;
-
-        assert(ref_physical_idx < static_cast<int32_t>(interpolation_data.size()));
+        if(ref_physical_idx >  static_cast<int32_t>(interpolation_data.size())) {
+	  std::cout << "Should never come here!!" << std::endl;
+	}
         interpolation_data.push_back(interpolation_data[ref_physical_idx]);
 
       }
-
-    } // all sorts of motion indices
-    else {
-      final_idx = index_mask[physical_idx] - 1;
-      interpolation_data.push_back(curr_frame->_unique_palette[final_idx]);
-    }
-    prev_mask_idx = curr_mask_idx;
+    
     curr_frame->_physical_blocks[physical_idx].interp = interpolation_data[physical_idx];
-  }
+  } // all sorts of motion indices
   return;
 }
 
@@ -412,6 +392,7 @@ void FastDecompressMultiUnique(const std::string input_file, const std::string o
   }
   uint32_t frame_height, frame_widht, total_frame_count;
   uint8_t unique_interval;
+  uint8_t search_area;
   in_stream.read(reinterpret_cast<char*>(&frame_height), 4);
 
 }
@@ -425,12 +406,14 @@ void DecompressMultiUnique(const std::string input_file, const std::string out_d
     exit(-1);
   }
   uint32_t frame_height, frame_width, total_frame_count;
-  uint8_t unique_interval;
+  uint8_t unique_interval, search_area;
   in_stream.read(reinterpret_cast<char*>(&frame_height), 4);
   in_stream.read(reinterpret_cast<char*>(&frame_width), 4);
   uint32_t num_blocks = (frame_height/4 * frame_width/4);
   in_stream.read(reinterpret_cast<char*>(&unique_interval), 1);
+  in_stream.read(reinterpret_cast<char*>(&search_area), 1);
   in_stream.read(reinterpret_cast<char*>(&total_frame_count), 4);
+
   std::unique_ptr<DXTImage> null_dxt(nullptr);
   std::unique_ptr<DXTImage> prev_frame(nullptr), curr_frame(nullptr), first_frame(nullptr);
   uint32_t frame_number = 0;
@@ -448,35 +431,25 @@ void DecompressMultiUnique(const std::string input_file, const std::string out_d
     for(uint8_t curr_idx = 0; curr_idx < unique_interval; curr_idx++) {
       uint8_t intra;
       frame_number++;
-      in_stream.read(reinterpret_cast<char*>(&intra), 1);
-      bool is_intra = static_cast<bool>(intra);
+      bool is_intra = false;
       // read 4 bytes which give total unique indices count
       uint32_t num_unique;
       in_stream.read(reinterpret_cast<char*>(&num_unique), 4);
-      // read 4 bytes which give size of compressed mask bytes
-      uint32_t mask_bytes;
-      in_stream.read(reinterpret_cast<char*>(&mask_bytes), 4);
       // read 4 bytes which give size of compressed motion indices
-      uint32_t indices_bytes;
-      in_stream.read(reinterpret_cast<char*>(&indices_bytes), 4);
-      // allocate memory for mask bytes and read mask bytes
-     std::vector<uint8_t> compressed_index_mask(mask_bytes, 0);
-     in_stream.read(reinterpret_cast<char*>(compressed_index_mask.data()), mask_bytes);
+      uint32_t motion_indices_bytes;
+      in_stream.read(reinterpret_cast<char*>(&motion_indices_bytes), 4);
      // allocate memory for unique indices values and read unique indices bytes
      std::vector<uint32_t> unique_indices(num_unique, 0);
      memcpy(unique_indices.data(), combined_8bit_palette.data() + unique_idx_offset, 4 * num_unique);
      unique_idx_offset += 4*num_unique;
      // allocate memory for motion_index data and read compressed motion indices
-     std::vector<uint8_t> compressed_motion_indices(indices_bytes, 0);
-     in_stream.read(reinterpret_cast<char*>(compressed_motion_indices.data()), indices_bytes);
+     std::vector<uint8_t> compressed_motion_indices(motion_indices_bytes, 0);
+     in_stream.read(reinterpret_cast<char*>(compressed_motion_indices.data()), motion_indices_bytes);
 
-     //Decompress the mask bytes using arithmetic decoder
-     std::vector<uint8_t> out_mask_bits(num_blocks,0);
-     EntropyDecode(compressed_index_mask, out_mask_bits, true);
 
 
      //Decompress the motion indices uisng arithmetic decoder
-     uint32_t num_motion_indices = (num_blocks - num_unique);
+     uint32_t num_motion_indices = num_blocks;
      std::vector<uint8_t> motion_indices(2 * num_motion_indices, 0);
      EntropyDecode(compressed_motion_indices, motion_indices, false);
      std::vector< std::tuple<uint8_t, uint8_t> > out_motion_indices;
@@ -486,8 +459,7 @@ void DecompressMultiUnique(const std::string input_file, const std::string out_d
     
     // Populate the physical and logical blocks using the data
     curr_frame.reset(new DXTImage(frame_width, frame_height, is_intra, unique_indices));
-    ReconstructInterpolationData(unique_indices, out_motion_indices,
-			       out_mask_bits, curr_frame, prev_frame);
+    ReconstructInterpolationData(unique_indices, out_motion_indices, curr_frame, prev_frame, search_area);
     curr_frame->SetLogicalBlocks(); 
     std::string out_frame = out_dir + "/" + std::to_string(frame_number);
 #ifndef NDEBUG  
@@ -548,11 +520,14 @@ void CompressMultiUnique(const std::string dir_name, const std::string out_file,
   // Write out frame height and frame width
   // Write the ---unique interval value--- 
   uint8_t unique_int = static_cast<uint8_t>(unique_interval);
+  uint8_t search_area_8bit = static_cast<uint8_t>(search_area);
   uint32_t total_frame_count = file_names.size() / unique_interval;
   out_stream.write(reinterpret_cast<const char*>(&frame_height), 4);
   out_stream.write(reinterpret_cast<const char*>(&frame_width), 4);
   out_stream.write(reinterpret_cast<const char*>(&unique_int), 1);
+  out_stream.write(reinterpret_cast<const char*>(&search_area), 1);
   out_stream.write(reinterpret_cast<const char*>(&total_frame_count), 4);
+
   out_stream.flush();
 
   // out_data to be written to file
@@ -651,6 +626,7 @@ void DecompressMPTCStream(const std::string input_file, const std::string out_di
   }
   //read the height and width once
   uint32_t frame_height, frame_width;
+  uint8_t search_area;
   in_stream.read(reinterpret_cast<char*>(&frame_height), 4);
   in_stream.read(reinterpret_cast<char*>(&frame_width), 4);
   uint32_t num_blocks = frame_height/4 * frame_width/4;
@@ -696,8 +672,7 @@ void DecompressMPTCStream(const std::string input_file, const std::string out_di
   std::unique_ptr<DXTImage> prev_frame(nullptr), curr_frame(nullptr), first_frame(nullptr);
   // Populate the physical and logical blocks using the data
   first_frame.reset(new DXTImage(frame_width, frame_height, is_intra, unique_indices));
-  ReconstructInterpolationData(unique_indices, out_motion_indices,
-			       out_mask_bits, first_frame, null_dxt);
+  ReconstructInterpolationData(unique_indices, out_motion_indices, first_frame, null_dxt, search_area);
   first_frame->SetLogicalBlocks(); 
   uint32_t frame_number = 0;
   std::string out_frame = out_dir + "/" + std::to_string(frame_number);
@@ -749,7 +724,7 @@ void DecompressMPTCStream(const std::string input_file, const std::string out_di
    // Populate the physical and logical blocks using the data
     curr_frame.reset(new DXTImage(frame_width, frame_height, is_intra, unique_indices));
     ReconstructInterpolationData(unique_indices, curr_out_motion_indices,
-	                         out_mask_bits, curr_frame, prev_frame);
+	                         curr_frame, prev_frame, search_area);
     curr_frame->SetLogicalBlocks();
  #ifndef NDEBUG  
 

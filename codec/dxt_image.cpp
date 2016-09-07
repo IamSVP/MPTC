@@ -618,8 +618,9 @@ int DXTImage::IntraSearch(int32_t block_idx, int32_t &min_err_x, int32_t &min_er
 
   int32_t search_space, offset;
 
-  offset_x = 16;
-  offset_y = 32;
+  int32_t offset_x = _search_area;
+  int32_t offset_y = 2 * _search_area - 1;
+
   int32_t block_x  = block_idx % _blocks_width;
   int32_t block_y = block_idx / _blocks_width;
 
@@ -680,8 +681,8 @@ int DXTImage::InterBlockSearch(std::unique_ptr<DXTImage> &reference, int32_t blo
 
   int32_t block_x = block_idx % _blocks_width;
   int32_t block_y = block_idx / _blocks_width;
-  int32_t search_space = 16;
-  int32_t offset = 16;
+  int32_t search_space = _search_area;
+  int32_t offset = _search_area;
   assert(block_x < _blocks_width && block_y < _blocks_height);
 
   blk._logical = _logical_blocks[block_idx];
@@ -803,7 +804,7 @@ void DXTImage::Reencode(std::unique_ptr<DXTImage> &reference, int ref_number) {
 #ifndef NDEBUG
     std::cout << "Frame intepolation data: " << std::endl;
 #endif
-
+  std::tuple<uint8_t, uint8_t> unique_motion_idx(255, 255);
   for(int32_t physical_idx = 0; physical_idx < static_cast<int32_t>(_physical_blocks.size()); physical_idx++) {
     int err_inter_pixel, err_inter_block, err_intra;
     int32_t min_err_x, min_err_y;
@@ -879,7 +880,7 @@ void DXTImage::Reencode(std::unique_ptr<DXTImage> &reference, int ref_number) {
       //}
     //}
  
-    _index_mask[physical_idx] = 1;
+    _motion_indices.push_back(unique_motion_idx);
     _unique_palette.push_back(_physical_blocks[physical_idx].interp);
     _global_palette.push_back(std::make_tuple(_physical_blocks[physical_idx].interp, physical_idx));
     _global_palette_dict.insert(_physical_blocks[physical_idx].interp);
