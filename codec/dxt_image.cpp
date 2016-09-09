@@ -493,6 +493,42 @@ std::unique_ptr<GreyImage> DXTImage::FoundMaskImage() const {
 DXTImage::DXTImage() {
 //Empty constructor
 }
+std::unique_ptr<RGB565Image> DXTImage::EndpointOneValues() const {
+  std::vector<uint8_t> result;
+  const size_t img_sz = 2 * BlocksWide() * BlocksHigh();
+  result.reserve(img_sz);
+
+  for (const auto &pb : _physical_blocks) {
+    uint32_t x = pb.ep1;
+    result.push_back(static_cast<uint8_t>((x >> 8) & 0xFF));
+    result.push_back(static_cast<uint8_t>(x & 0xFF));
+  }
+
+  assert(result.size() == img_sz);
+
+  std::unique_ptr<RGB565Image> img
+    (new RGB565Image(BlocksWide(), BlocksHigh(), std::move(result)));
+  return std::move(img);
+}
+
+std::unique_ptr<RGB565Image> DXTImage::EndpointTwoValues() const {
+  std::vector<uint8_t> result;
+  const size_t img_sz = 2 * BlocksWide() * BlocksHigh();
+  result.reserve(img_sz);
+
+  for (const auto &pb : _physical_blocks) {
+    uint32_t x = pb.ep2;
+    result.push_back(static_cast<uint8_t>((x >> 8) & 0xFF));
+    result.push_back(static_cast<uint8_t>(x & 0xFF));
+  }
+
+  assert(result.size() == img_sz);
+
+  std::unique_ptr<RGB565Image> img
+    (new RGB565Image(BlocksWide(), BlocksHigh(), std::move(result)));
+  return std::move(img);
+}
+
 
 std::unique_ptr<RGBImage> DXTImage::EndpointOneImage() const {
   std::vector<uint8_t> result;

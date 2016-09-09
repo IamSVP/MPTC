@@ -4,6 +4,11 @@
 #include "arithmetic_codec.h"
 #include "stb_image_write.h"
 #include "utils.h"
+#include "image.h"
+#include "image_processing.h"
+#include "image_utils.h"
+#include "pipeline.h"
+#include "entropy.h"
 
 #include <dirent.h>
 #include <fstream>
@@ -11,11 +16,15 @@
 #include <algorithm>
 #include <vector>
 #include <cmath>
+#include <atomic>
 
 //#define PALETTECOMP
-//#define ENDPOINTIMG
+#define ENDPOINTIMG
 #define COMBINEPALETTE
 namespace MPTC {
+
+static const size_t kWaveletBlockDim = 32;
+static_assert((kWaveletBlockDim % 2) == 0, "Wavelet dimension must be power of two!");
 
 const uint32_t max_bytes = 1048576; // 1MB 
 
@@ -35,6 +44,35 @@ double MeasureEntropy(std::vector<uint8_t> &symbols) {
 }
 
 //Entropy Encode a bunch of symbols 
+void EntropyEncode(std::unique_ptr< std::vector<uint8_t> > &symbols, std::vector<uint8_t> &out_data, 
+                   bool is_bit_model) {
+  std::vector<uint8_t> temp_out_data;
+  temp_out_data.resize(max_bytes, 0);
+  entropy::Arithmetic_Codec arith_data_encoder(max_bytes, temp_out_data.data());
+  if(!is_bit_model) {
+    entropy::Adaptive_Data_Model data_model(257);
+    arith_data_encoder.start_encoder();
+    for(size_t idx = 0; idx < symbols->size(); idx++ ) {
+      arith_data_encoder.encode(symbols->operator[](idx), data_model);
+    }
+    arith_data_encoder.stop_encoder();
+    uint32_t compressed_size = arith_data_encoder.get_num_bytes();
+    out_data.resize(out_data.size() + compressed_size);
+    memcpy(out_data.data()+(out_data.size()-compressed_size), temp_out_data.data(), compressed_size);
+  }
+  else {
+    entropy::Adaptive_Bit_Model data_model;
+    arith_data_encoder.start_encoder();
+    for(size_t idx = 0; idx < symbols->size(); idx++ ) {
+      arith_data_encoder.encode(symbols->operator[](idx), data_model);
+    }
+    arith_data_encoder.stop_encoder();
+    uint32_t compressed_size = arith_data_encoder.get_num_bytes();
+    out_data.resize(out_data.size() + compressed_size);
+    memcpy(out_data.data()+(out_data.size() - compressed_size), temp_out_data.data(), compressed_size);
+  }
+}
+
 void EntropyEncode(std::vector<uint8_t> &symbols, std::vector<uint8_t> &out_data, 
                    bool is_bit_model) {
   std::vector<uint8_t> temp_out_data;
@@ -377,6 +415,50 @@ void EntropyDecode(std::vector<uint8_t> &compressed_data, std::vector<uint8_t> &
   return;
 }
 
+
+template <typename T> std::unique_ptr<std::vector<uint8_t> >
+RunDXTEndpointPipeline(const std::unique_ptr<Image<T> > &img) {
+  static_assert(PixelTraits::NumChannels<T>::value,
+    "This should operate on each DXT endpoing channel separately");
+
+  const bool kIsSixBits = PixelTraits::BitsUsed<T>::value == 6;
+  typedef typename WaveletResultTy<T, kIsSixBits>::DstTy WaveletSignedTy;
+  typedef typename PixelTraits::UnsignedForSigned<WaveletSignedTy>::Ty WaveletUnsignedTy;
+
+  auto pipeline = Pipeline<Image<T>, Image<WaveletSignedTy> >
+    ::Create(FWavelet2D<T, kWaveletBlockDim>::New())
+    ->Chain(MakeUnsigned<WaveletSignedTy>::New())
+    ->Chain(Linearize<WaveletUnsignedTy>::New())
+    ->Chain(RearrangeStream<WaveletUnsignedTy>::New(img->Width(), kWaveletBlockDim))
+    ->Chain(ReducePrecision<WaveletUnsignedTy, uint8_t>::New());
+
+  return std::move(pipeline->Run(img));
+}
+
+
+void CompressEndpoint(std::unique_ptr<RGB565Image> ep_img ) {
+
+  auto initial_endpoint_pipeline =
+  Pipeline<RGB565Image, YCoCg667Image>
+  ::Create(RGB565toYCoCg667::New())
+  ->Chain(std::move(ImageSplit<YCoCg667>::New()));
+
+  auto ep1_planes = initial_endpoint_pipeline->Run(ep_img);
+  auto ep1_y_cmp = RunDXTEndpointPipeline(std::get<0>(*ep1_planes));
+
+  auto ep1_co_cmp = RunDXTEndpointPipeline(std::get<1>(*ep1_planes));
+
+  auto ep1_cg_cmp = RunDXTEndpointPipeline(std::get<2>(*ep1_planes));
+  std::vector<uint8_t> y_planes;
+  EntropyEncode(ep1_y_cmp, y_planes, false);
+
+  ep1_co_cmp->insert(ep1_co_cmp->end(), ep1_cg_cmp->begin(), ep1_cg_cmp->end());
+  std::vector<uint8_t> chroma_planes;
+  EntropyEncode(ep1_co_cmp, chroma_planes, false);
+  std::cout << "Total bytes of Endpoints:" << y_planes.size() + chroma_planes.size() << std::endl;
+
+}
+
 void FastDecompressMultiUnique(const std::string input_file, const std::string out_dir) {
   // Minimize memory copies 
   // Remove all unnecessary copies
@@ -557,7 +639,8 @@ void CompressMultiUnique(const std::string dir_name, const std::string out_file,
     std::cout << "PSNR after reencoding: " << curr_frame->PSNR() << std::endl;
     std::cout << "Total blocks found: " << curr_frame->_motion_indices.size() << std::endl;
     std::cout << "Inter pixel blocks:" << curr_frame->_inter_pixel_motion_indices.size() << std::endl;
-#endif 
+#endif
+    CompressEndpoint(std::move(curr_frame->EndpointOneValues()));
 #ifdef ENDPOINTIMG
     std::string ep_file;
     ep_file.clear();

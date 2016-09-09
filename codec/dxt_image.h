@@ -62,6 +62,8 @@ LogicalDXTBlock PhysicalToLogical(const PhysicalDXTBlock &b);
      std::unique_ptr<RGBImage> EndpointTwoImage() const;
      std::unique_ptr<RGBImage> DecompressedImage() const;
      std::unique_ptr<GreyImage> InterpolationImage() const;
+     std::unique_ptr<RGB565Image> EndpointOneValues() const;
+     std::unique_ptr<RGB565Image> EndpointTwoValues() const;
      
      static std::vector<uint8_t> TwoBitValuesToImage(const std::vector<uint8_t> &v);
      std::vector<uint8_t> InterpolationValues() const;

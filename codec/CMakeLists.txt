@@ -8,12 +8,19 @@ set( HEADERS
   "pixel_traits.h"
   "image.h"
   "codec.h"
+  "image_utils.h"
+  "pipeline.h"
+  "image_processing.h"
+  "wavelet.h"
+  "entropy.h"
 )
 
 set( SOURCES
   "dxt_image.cpp"
   "image.cpp"
   "codec.cpp"
+  "wavelet.cpp"
+  "image_processing.cpp"
 )
 
 add_library(mptc_codec ${HEADERS} ${SOURCES})
