@@ -8,6 +8,52 @@
 
 namespace MPTC {
 
+
+/*template <typename T1, typename T2, typename T3>*/
+//class ImageCombine<std::tuple<T1, T2, T3> > 
+  //: public PipelineUnit<std::tuple<std::unique_ptr<Image<T1> >,
+                                   //std::unique_ptr<Image<T2> >,
+				   //std::unique_ptr<Image<T3> > >,
+			//Image<std::tuple<T1, T2, T3> > {
+  //typedef std::tuple<T1, T2, T3> PixelTy;
+  //static_assert(PixelTraits::NumChannels<PixelTy>::value == 3,
+                //"Pixel4 has four channels!");
+  //static const size_t kNumChannels = PixelTraits::NumChannels<PixelTy>::value;
+//public:
+  //typedef std::unique_ptr<Image<T1> > I1Ty;
+  //typedef std::unique_ptr<Image<T2> > I2Ty;
+  //typedef std::unique_ptr<Image<T3> > I3Ty;
+  //typedef PipelineUnit<std::tuple<I1Ty, I2Ty, I3Ty>, Image<PixelTy> > Base;
+
+  //static std::unique_ptr<Base> New() {
+    //return std::unique_ptr<Base>(new ImageCombine<PixelTy>());
+  //}
+  //typename Base::ReturnType Run(const std::tuple<I1Ty, I2Ty, I3Ty>  &in) const override {
+    //I1Ty img1 = std::get<0>(in);
+    //I2Ty img2 = std::get<1>(in);
+    //I3Ty img3 = std::get<2>(in);
+
+    //size_t width = img1->Width();
+    //size_t height = img1->Height();
+    //Image<PixelTy> *result = new Image<PixelTy>(width, height);
+
+    //for (size_t j = 0; j < in->Height(); ++j) {
+      //for (size_t i = 0; i < in->Width(); ++i) {
+	//auto pix1 = img1->GetAt(i, j);
+	//auto pix2 = img2->GetAt(i, j);
+	//auto pix3 = img3->GetAt(i, j);
+	
+        //PixelTy pixel(std::make_tuple(pix1, pix2, pix3));
+        //result->SetAt(i, j, pixel);
+      //}
+    //}
+
+    //return std::move(typename Base::ReturnType(result));
+  //}
+
+
+/*}*/;
+
 template <typename T>
 class ImageSplit { };
 
@@ -105,6 +151,8 @@ class ImageSplit<std::tuple<T1, T2, T3, T4> >
 typedef ImageSplit<RGB> RGBSplitter;
 typedef ImageSplit<RGBA> RGBASplitter;
 typedef ImageSplit<RGB> YCrCbSplitter;
+template class ImageSplit<RGB565>;
+
 
 template<typename T>
 class Linearize : public PipelineUnit<Image<T>, std::vector<T> > {
@@ -123,6 +171,41 @@ class Linearize : public PipelineUnit<Image<T>, std::vector<T> > {
     return std::move(std::unique_ptr<std::vector<T> >(result));
   }
 };
+
+template<typename T>
+class DeLinearize : public PipelineUnit<std::vector<T>, Image<T> > {
+
+ public:
+  typedef PipelineUnit<std::vector<T>, Image<T> > Base;
+  static std::unique_ptr<Base> New(uint32_t width, uint32_t height) { 
+    _width = width; _height = height;
+    return std::unique_ptr<Base>(std::move(new DeLinearize<T>));
+  }
+  typename Base::ReturnType Run(const typename Base::ArgType &in) const override {
+    //assert(in->Width() > 0);
+    //assert(in->Height() > 0);
+    Image<T> *result = new Image<T>(_width, _height);
+    assert(in->size() == result->Height() * result->Width());
+
+    for(uint32_t h = 0; h < _height; h++) {
+      for(uint32_t w = 0; w < _width; w++) {
+         uint32_t pix_idx = h * _width + w;
+	 result->SetAt(w, h, in->operator[](pix_idx));
+      }
+    }
+    // This only works on single channel images, so the following
+    // should hold true..
+    
+    return std::move(std::unique_ptr< Image<T> >(result));
+  }
+ private:
+ static uint32_t _height, _width;
+};
+template<typename T>
+uint32_t DeLinearize<T>::_height;
+
+template<typename T>
+uint32_t DeLinearize<T>::_width;
 
 class DropAlpha : public PipelineUnit<RGBAImage, RGBImage> {
  public:
@@ -155,6 +238,33 @@ class MakeUnsigned
      return std::move(typename Base::ReturnType(result));
    }
 };
+
+
+template <typename T>
+class MakeSigned
+  : public PipelineUnit < Image<T>, Image<typename PixelTraits::SignedForUnsigned<T>::Ty > > {
+ public:
+   typedef typename PixelTraits::SignedForUnsigned<T>::Ty DstTy;
+   typedef Image<T> InputImage;
+   typedef Image<DstTy> OutputImage;
+   typedef PipelineUnit<InputImage, OutputImage> Base;
+
+   static std::unique_ptr<Base> New() { return std::unique_ptr<Base>(new MakeSigned); }
+
+   typename Base::ReturnType Run(const typename Base::ArgType &in) const override {
+     OutputImage *result = new OutputImage(in->Width(), in->Height());
+     for (size_t y = 0; y < in->Height(); ++y) {
+       for (size_t x = 0; x < in->Width(); ++x) {
+         const T pixel = in->GetAt(x, y);
+         const DstTy out = static_cast<DstTy>(PixelTraits::ToSigned<T, DstTy>::cvt(pixel));
+         result->SetAt(x, y, out);
+       }
+     }
+
+     return std::move(typename Base::ReturnType(result));
+   }
+};
+
 
 ////////////////////////////////////////////////////////////
 // Output utils

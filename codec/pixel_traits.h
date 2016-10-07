@@ -246,6 +246,14 @@ struct BitPacker<std::tuple<T1, T2, T3, T4> > {
 
 ////////////////////////////////////////////////////////////
 
+template <typename InTy, typename SigTy> 
+struct ToSigned {
+  static int64_t cvt(InTy x) {
+    uint32_t M =  static_cast<uint32_t>(-(Min<SigTy>::value));
+    return static_cast<int64_t>( x - M);
+  }
+};
+
 template <typename T>
 struct ToUnsigned {
   static uint64_t cvt(T x) {

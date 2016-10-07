@@ -23,7 +23,27 @@ set( SOURCES
   "image_processing.cpp"
 )
 
+set(D_HEADERS
+    "wavelet.h"
+    "decoder.h"
+    )
+set(D_SOURCES
+    "wavelet.cpp"
+    "decoder.cpp"
+    )
+
 add_library(mptc_codec ${HEADERS} ${SOURCES})
 target_link_libraries(mptc_codec arith_codec)
+
+add_library(mptc_decoder ${D_HEADERS} ${D_SOURCES})
+find_package(Threads REQUIRED)
+if(CMAKE_THREAD_LIBS_INIT)
+  target_link_libraries(mptc_decoder "${CMAKE_THREAD_LIBS_INIT}")
+endif()
+target_link_libraries(mptc_decoder arith_codec)
+
 add_executable(mptc_encoder encoder.cpp)
 target_link_libraries(mptc_encoder mptc_codec arith_codec)
+
+add_executable(test_decoder test_decoder.cpp)
+target_link_libraries(test_decoder mptc_decoder)

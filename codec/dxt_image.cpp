@@ -918,8 +918,6 @@ void DXTImage::Reencode(std::unique_ptr<DXTImage> &reference, int ref_number) {
  
     _motion_indices.push_back(unique_motion_idx);
     _unique_palette.push_back(_physical_blocks[physical_idx].interp);
-    _global_palette.push_back(std::make_tuple(_physical_blocks[physical_idx].interp, physical_idx));
-    _global_palette_dict.insert(_physical_blocks[physical_idx].interp);
     
   }
 }

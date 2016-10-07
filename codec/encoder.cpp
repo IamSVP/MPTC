@@ -474,9 +474,9 @@ int main(int argc, char *argv[]) {
   //MPTC::CompressPNGStream(dir_path, out_file_path, search_area, vErrThreshold, interval, ep_dir);
   
   //MPTC::DecompressMPTCStream(out_file_path, out_dir, interval);
-  MPTC::CompressMultiUnique(dir_path, out_file_path, search_area, vErrThreshold, 
-                            intra_interval, unique_interval, ep_dir);
-  MPTC::DecompressMultiUnique(out_file_path, out_dir);
+  //MPTC::CompressMultiUnique(dir_path, out_file_path, search_area, vErrThreshold, 
+                            //intra_interval, unique_interval, ep_dir);
+  MPTC::DecompressMultiUnique(out_file_path, out_dir, ep_dir);
   
   return 0;
 }

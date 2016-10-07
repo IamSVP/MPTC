@@ -13,7 +13,8 @@ void CompressPNGStream(const std::string dir_name, const std::string out_file, u
 
 void EntropyEncode(std::unique_ptr<MPTC::DXTImage> &dxt_frame, std::vector<uint8_t> &out_data);
 
-void DecompressMultiUnique(const std::string input_file, const std::string out_dir);
+void DecompressMultiUnique(const std::string input_file, const std::string out_dir,
+                           const std::string rgb_dir);
 
 void CompressMultiUnique(const std::string dir_name, const std::string out_file, 
                          uint32_t search_area, int32_t vErrThreshold, uint32_t intra_interval, 

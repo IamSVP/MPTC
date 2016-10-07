@@ -264,6 +264,7 @@ struct WaveletResultTy<T, false> {
   static const size_t kNumDstBits = PixelTraits::BitsUsed<T>::value + 1;
 };
 
+
 template <typename T, size_t BlockSize>
 class FWavelet2D : public PipelineUnit<Image<T>,
   Image< typename WaveletResultTy<T, PixelTraits::BitsUsed<T>::value == 6 >::DstTy > > {
@@ -323,6 +324,71 @@ public:
             assert(static_cast<DstTy>(block[local_idx]) <= PixelTraits::Max<DstTy>::value);
             assert(static_cast<DstTy>(block[local_idx]) >= PixelTraits::Min<DstTy>::value);
             result->SetAt(i + x, j + y, static_cast<DstTy>(block[local_idx]));
+          }
+        }
+      }
+    }
+
+    return std::move(typename Base::ReturnType(result));
+  }
+};
+
+template <typename InputTy, typename OutputTy, size_t BlockSize>
+class IWavelet2D : public PipelineUnit<Image< InputTy>, Image<OutputTy> > {
+public:
+  static const size_t kNumDstBits = PixelTraits::BitsUsed<OutputTy>::value;
+  static const size_t kNumSrcBits = InputTy::kNumDstBits;
+
+  typedef Image<OutputTy> OutputImage;
+  typedef Image<InputTy> InputImage;
+  typedef PipelineUnit<InputImage, OutputImage> Base;
+
+  static_assert(PixelTraits::NumChannels<InputTy>::value == 1,
+    "Wavelet transform only operates on single channel images");
+  static_assert(PixelTraits::BitsUsed<typename OutputImage::PixelType>::value <= 16,
+    "Wavelet coefficients end up in 16 bit signed integers!");
+  static_assert((BlockSize & (BlockSize - 1)) == 0,
+    "Block size must be a power of two!");
+
+  static std::unique_ptr<Base> New() {
+    return std::unique_ptr<Base>(new IWavelet2D<InputTy, OutputTy, BlockSize>);
+  }
+
+  virtual typename Base::ReturnType Run(const typename Base::ArgType &in) const override {
+    assert((in->Width() % BlockSize) == 0);
+    assert((in->Height() % BlockSize) == 0);
+    OutputImage *result = new OutputImage(in->Width(), in->Height());
+
+    for (size_t j = 0; j < in->Height(); j += BlockSize) {
+      for (size_t i = 0; i < in->Width(); i += BlockSize) {
+        std::vector<int16_t> block(BlockSize * BlockSize);
+
+        // Populate block
+        for (size_t y = 0; y < BlockSize; ++y) {
+          for (size_t x = 0; x < BlockSize; ++x) {
+            size_t local_idx = y * BlockSize + x;
+            InputTy pixel = in->GetAt(i + x, j + y);
+            assert(static_cast<int64_t>(pixel) <= PixelTraits::Max<int16_t>::value);
+            assert(static_cast<int64_t>(pixel) >= PixelTraits::Min<int16_t>::value);
+            block[local_idx] = static_cast<int16_t>(pixel);
+          }
+        }
+
+        // Do transform
+        static const size_t kRowBytes = sizeof(int16_t) * BlockSize;
+        size_t dim = 2;
+        while (dim <= BlockSize) {
+          InverseWavelet2D(block.data(), kRowBytes, block.data(), kRowBytes, dim);
+          dim *= 2;
+        }
+
+        // Output to image...
+        for (size_t y = 0; y < BlockSize; ++y) {
+          for (size_t x = 0; x < BlockSize; ++x) {
+            size_t local_idx = y * BlockSize + x;
+            assert(static_cast<OutputTy>(block[local_idx]) <= PixelTraits::Max<OutputTy>::value);
+            assert(static_cast<OutputTy>(block[local_idx]) >= PixelTraits::Min<OutputTy>::value);
+            result->SetAt(i + x, j + y, static_cast<OutputTy>(block[local_idx]));
           }
         }
       }

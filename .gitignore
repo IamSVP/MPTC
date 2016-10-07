@@ -1,2 +1,5 @@
 build/*
 *.swp
+*.swn
+*.out
+*.bin

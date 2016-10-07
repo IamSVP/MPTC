@@ -183,6 +183,11 @@ typedef Image<UnsignedBits<1> > BinaryImage;
 typedef Image<UnsignedBits<2> > TwoBitImage;
 typedef Image<UnsignedBits<3> > ThreeBitImage;
 typedef Image<UnsignedBits<4> > FourBitImage;
+typedef Image<UnsignedBits<5> > FiveBitImage;
+typedef Image<UnsignedBits<6> > SixBitImage;
+typedef Image<UnsignedBits<7> > SevenBitImage;
+typedef Image<SignedBits<7> > SigSevenBitImage;
+typedef Image<SignedBits<7> > SigEightBitImage;
 typedef Image<int16_t> SixteenBitImage;
 
 // YCbCrImages aren't packed since we only really get them
