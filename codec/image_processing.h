@@ -337,7 +337,7 @@ template <typename InputTy, typename OutputTy, size_t BlockSize>
 class IWavelet2D : public PipelineUnit<Image< InputTy>, Image<OutputTy> > {
 public:
   static const size_t kNumDstBits = PixelTraits::BitsUsed<OutputTy>::value;
-  static const size_t kNumSrcBits = InputTy::kNumDstBits;
+  static const size_t kNumSrcBits; //= InputTy::kNumDstBits;
 
   typedef Image<OutputTy> OutputImage;
   typedef Image<InputTy> InputImage;

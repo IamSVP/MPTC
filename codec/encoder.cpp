@@ -9,8 +9,11 @@
 #include <string>
 #include <algorithm>
 #include <functional>
+#ifdef _MSC_VER
+#include "win/dirent.h"
+#else // _MSC_VER
 #include <dirent.h>
-
+#endif
 
 #include "codec.h"
 #include "stb_image_write.h"
