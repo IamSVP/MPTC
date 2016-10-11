@@ -11,11 +11,16 @@
 #include "pipeline.h"
 #include "entropy.h"
 
+#ifdef _MSC_VER
+#include "win/dirent.h"
+#else // _MSC_VER
 #include <dirent.h>
+#endif
 #include <fstream>
 #include <tuple>
 #include <algorithm>
 #include <vector>
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <atomic>
 #include <typeinfo>
@@ -477,19 +482,38 @@ void ReconstructDXTData(std::vector<uint32_t> &unique_indices,
       }
     curr_frame->_physical_blocks[physical_idx].interp = interpolation_data[physical_idx];
 
-    /*r = g = b = 0;*/
-    //r = ep1[3 * physical_idx];
-    //g = ep1[3 * physical_idx + 1];
-    /*b = ep1[3 * physical_idx + 2];*/
-    //r = R1.ReadBits(5);
-    //g = R1.ReadBits(6);
-    //b = R1.ReadBits(5);
-/*    uint16_t rgb565_1 = Pack(ep1 + 3 * physical_idx);*/
-    //[>rgb565_1 |= (r << 11);<]
-    ////rgb565_1 |= (g << 5);
-    //[>rgb565_1 |= (b);<]
-    //curr_frame->_physical_blocks[physical_idx].ep1 = rgb565_1;
+    /*[>r = g = b = 0;<]*/
+    ////r = ep1[3 * physical_idx];
+    ////g = ep1[3 * physical_idx + 1];
+    //[>b = ep1[3 * physical_idx + 2];<]
+    ////r = R1.ReadBits(5);
+    ////g = R1.ReadBits(6);
+    ////b = R1.ReadBits(5);
+//[>    uint16_t rgb565_1 = Pack(ep1 + 3 * physical_idx);<]
+    ////[>rgb565_1 |= (r << 11);<]
+    //////rgb565_1 |= (g << 5);
+    ////[>rgb565_1 |= (b);<]
+    ////curr_frame->_physical_blocks[physical_idx].ep1 = rgb565_1;
  
+    ////[>r = g = b = 0;<]
+    //////r = ep2[3 * physical_idx];
+    //////g = ep2[3 * physical_idx + 1];
+    //////b = ep2[3 * physical_idx + 2];
+
+    //////r = R2.ReadBits(5);
+    //////g = R2.ReadBits(6);
+    //////b = R2.ReadBits(5);
+    ////uint16_t rgb565_2 = Pack(ep2 + 3 * physical_idx);
+////[>    rgb565_2 |= (r << 11);<]
+    //////rgb565_2 |= (g << 5);
+    //////rgb565_2 |= (b);
+    ////curr_frame->_physical_blocks[physical_idx].ep2 = rgb565_2;
+    //////RecomputeIndex();
+
+    ////if(curr_frame->_physical_blocks[physical_idx].ep1 < curr_frame->_physical_blocks[physical_idx].ep2) {
+
+      ////std::swap(curr_frame->_physical_blocks[physical_idx].ep1, curr_frame->_physical_blocks[physical_idx].ep2);
+     ////std::bitset<32> x1(curr_frame->_physical_blocks[physical_idx].interp);
     //[>r = g = b = 0;<]
     ////r = ep2[3 * physical_idx];
     ////g = ep2[3 * physical_idx + 1];
@@ -503,7 +527,7 @@ void ReconstructDXTData(std::vector<uint32_t> &unique_indices,
     ////rgb565_2 |= (g << 5);
     ////rgb565_2 |= (b);
     //curr_frame->_physical_blocks[physical_idx].ep2 = rgb565_2;
-    ////RecomputeIndex();
+   
 
     //if(curr_frame->_physical_blocks[physical_idx].ep1 < curr_frame->_physical_blocks[physical_idx].ep2) {
 

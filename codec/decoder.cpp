@@ -683,6 +683,7 @@ int InitBufferedDecode(uint8_t buffer_sz,
   ptr_buffer_struct->curr_decode_idx = ptr_buffer_struct->buffer_sz - 1;
   ptr_buffer_struct->prev_decode_idx = ptr_buffer_struct->buffer_sz - 1 - 1;
 
+  return 0;
 }
 
 
@@ -710,5 +711,6 @@ int GetBufferedFrame(BufferStruct *ptr_buffer_struct, PhysicalDXTBlock * &curr_d
   ptr_buffer_struct->curr_dxt_idx = 
     (ptr_buffer_struct->curr_dxt_idx + 1) % ptr_buffer_struct->buffer_sz;
 
+  return 0;
 }
  
