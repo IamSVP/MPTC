@@ -36,9 +36,11 @@ add_library(mptc_codec ${HEADERS} ${SOURCES})
 target_link_libraries(mptc_codec arith_codec)
 
 add_library(mptc_decoder ${D_HEADERS} ${D_SOURCES})
+
 find_package(Threads REQUIRED)
 if(CMAKE_THREAD_LIBS_INIT)
   target_link_libraries(mptc_decoder "${CMAKE_THREAD_LIBS_INIT}")
+  target_link_libraries(mptc_codec "${CMAKE_THREAD_LIBS_INIT}")
 endif()
 target_link_libraries(mptc_decoder arith_codec)
 

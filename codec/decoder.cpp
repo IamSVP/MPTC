@@ -630,12 +630,12 @@ void GetFrameMultiThread(std::ifstream &in_stream,
 
    decode_info->curr_idx++;
 
-   if(decode_info->curr_frame >= decode_info->total_frame_count) {
-     in_stream.seekg(0, in_stream.beg);
-     in_stream.seekg(34);
-     decode_info->is_unique = true;
-     decode_info->curr_frame = 0;
-   }
+/*   if(decode_info->curr_frame >= decode_info->total_frame_count) {*/
+     //in_stream.seekg(0, in_stream.beg);
+     //in_stream.seekg(34);
+     //decode_info->is_unique = true;
+     //decode_info->curr_frame = 0;
+   //}
 
   return;
 }

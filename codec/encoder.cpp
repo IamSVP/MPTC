@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <functional>
 #include <dirent.h>
+#include <chrono>
 
 
 #include "codec.h"
@@ -463,20 +464,39 @@ int main(int argc, char *argv[]) {
   int32_t intra_interval = std::stoi(argv[2], nullptr, 10);
   uint32_t unique_interval = std::stoi(argv[3], nullptr, 10);
   int32_t vErrThreshold = std::stoi(argv[4], nullptr, 10);
-
-  std::string dir_path(argv[5]);
-  std::string out_file_path(argv[6]);
-  std::string out_dir(argv[7]);
+  uint32_t thread_count = std::stoi(argv[5], nullptr, 10);
+  std::string dir_path(argv[6]);
+  std::string out_file_path(argv[7]);
+  std::string out_dir(argv[8]);
   std::string ep_dir;
   if(argc > 7)
-   ep_dir = std::string(argv[8]);
+   ep_dir = std::string(argv[9]);
   
   //MPTC::CompressPNGStream(dir_path, out_file_path, search_area, vErrThreshold, interval, ep_dir);
   
   //MPTC::DecompressMPTCStream(out_file_path, out_dir, interval);
-  //MPTC::CompressMultiUnique(dir_path, out_file_path, search_area, vErrThreshold, 
-                            //intra_interval, unique_interval, ep_dir);
+  /*MPTC::CompressMultiUnique(dir_path, out_file_path, search_area, vErrThreshold, */
+                            /*intra_interval, unique_interval, ep_dir);*/
+  //MPTC::DecompressMultiUnique(out_file_path, out_dir, ep_dir);
+  //
+  //
+  uint32_t wavelet_block_sz;
+  auto t1 = std::chrono::high_resolution_clock::now();
+
+  /*MPTC::ThreadedCompressMultiUnique(dir_path,*/
+				    //out_file_path,
+				    //search_area,
+				    //vErrThreshold,
+				    //intra_interval,
+				    //unique_interval,
+				    //wavelet_block_sz,
+				    //ep_dir,
+				    //thread_count);
+   //auto t2 = std::chrono::high_resolution_clock::now();
+   //std::chrono::duration<double> fp_ms = t2 - t1;
+   /*std::cout << "Time:" << fp_ms.count() << std::endl;*/
+
   MPTC::DecompressMultiUnique(out_file_path, out_dir, ep_dir);
-  
+ 
   return 0;
 }

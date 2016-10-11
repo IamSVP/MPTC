@@ -32,7 +32,10 @@ struct UnsignedBits {
   uint64_t x;
 
   UnsignedBits(): x(0) { }
-  UnsignedBits(uint64_t _x): x(_x) {
+  UnsignedBits(uint64_t _x) {
+    x = _x;
+    //std::cout << "casted value" << x << std::endl;
+    //std::cout << "numbits: " << NumBits << std::endl;
     assert(_x < (1 << NumBits));
   }
   operator uint64_t() const { return x; }

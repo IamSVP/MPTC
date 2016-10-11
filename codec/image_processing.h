@@ -359,9 +359,9 @@ public:
     assert((in->Height() % BlockSize) == 0);
     OutputImage *result = new OutputImage(in->Width(), in->Height());
 
+    std::vector<int16_t> block(BlockSize * BlockSize);
     for (size_t j = 0; j < in->Height(); j += BlockSize) {
       for (size_t i = 0; i < in->Width(); i += BlockSize) {
-        std::vector<int16_t> block(BlockSize * BlockSize);
 
         // Populate block
         for (size_t y = 0; y < BlockSize; ++y) {
@@ -386,6 +386,9 @@ public:
         for (size_t y = 0; y < BlockSize; ++y) {
           for (size_t x = 0; x < BlockSize; ++x) {
             size_t local_idx = y * BlockSize + x;
+	    //std::cout << "unconverted value:" << block[local_idx] << std::endl;
+	    //std::cout << "value:" << static_cast<OutputTy>(block[local_idx]) << std::endl;
+
             assert(static_cast<OutputTy>(block[local_idx]) <= PixelTraits::Max<OutputTy>::value);
             assert(static_cast<OutputTy>(block[local_idx]) >= PixelTraits::Min<OutputTy>::value);
             result->SetAt(i + x, j + y, static_cast<OutputTy>(block[local_idx]));

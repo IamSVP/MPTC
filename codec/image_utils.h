@@ -256,7 +256,7 @@ class MakeSigned
      for (size_t y = 0; y < in->Height(); ++y) {
        for (size_t x = 0; x < in->Width(); ++x) {
          const T pixel = in->GetAt(x, y);
-         const DstTy out = static_cast<DstTy>(PixelTraits::ToSigned<T, DstTy>::cvt(pixel));
+         const DstTy out = static_cast<DstTy>(pixel-128);
          result->SetAt(x, y, out);
        }
      }

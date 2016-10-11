@@ -16,6 +16,16 @@ void EntropyEncode(std::unique_ptr<MPTC::DXTImage> &dxt_frame, std::vector<uint8
 void DecompressMultiUnique(const std::string input_file, const std::string out_dir,
                            const std::string rgb_dir);
 
+void ThreadedCompressMultiUnique(const std::string dir_name,
+                                 const std::string out_file,
+				 uint32_t search_area,
+				 int32_t vErrThreshold,
+				 uint32_t intra_interval,
+				 uint32_t unique_interval,
+				 uint32_t wavelet_block_sz,
+				 std::string ep_dir,
+				 uint32_t thread_count);
+
 void CompressMultiUnique(const std::string dir_name, const std::string out_file, 
                          uint32_t search_area, int32_t vErrThreshold, uint32_t intra_interval, 
 			 uint32_t unique_interval, std::string ep_dir);
