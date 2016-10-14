@@ -72,7 +72,7 @@ LogicalDXTBlock PhysicalToLogical(const PhysicalDXTBlock &b);
 
      inline uint32_t ErrorReencode();
      int IntraSearch(int32_t block_idx, int32_t &min_err_x, int32_t &min_err_y, 
-	             uint32_t &index, CompressedBlock &blk, bool &re_assigned);
+	             uint32_t &index, CompressedBlock &blk, bool &re_assigned, uint8_t search_space);
 
      int InterBlockSearch(std::unique_ptr<DXTImage> &reference, int32_t block_idx, 
 	                  int32_t &min_err_x, int32_t &min_err_y, int ref_number, 
@@ -88,6 +88,7 @@ LogicalDXTBlock PhysicalToLogical(const PhysicalDXTBlock &b);
      uint32_t Get4X4InterpolationBlock(uint32_t x, uint32_t y);
      std::vector<uint8_t> Get4X4ColorsBlock(uint32_t x, uint32_t y); 
 
+     void ReencodeAndAnalyze(std::unique_ptr<DXTImage> &reference, int ref_number, std::vector<std::tuple<uint8_t, uint8_t> > &motion_indices, uint8_t search_space);
      void Reencode(std::unique_ptr<DXTImage> &reference, int ref_number);
      double PSNR() const;     
      void SetInterpolationData(std::vector<uint32_t> &interpolation_data);
