@@ -1,5 +1,5 @@
 #ifndef __MPTC_DECODER_H__
-#define __MPTCDECODER_H__
+#define __MPTC_DECODER_H__
 
 
 #include "arithmetic_codec.h"
