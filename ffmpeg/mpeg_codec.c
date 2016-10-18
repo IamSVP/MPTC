@@ -30,6 +30,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <time.h>
 
 // compatibility with newer API
 #if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(55,28,1)
@@ -198,9 +199,17 @@ int main(int argc, char *argv[]) {
          );
 
   // Read frames and save first five frames to disk
+  uint64_t frame_count = 0;
+  double total_time = 0.0;
   i=0;
   while(1) {
+    clock_t t;
+    t = clock();
     data = getFrame();
+    t = clock() - t;
+    double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds
+    total_time += time_taken;
+    frame_count++;
     printf("data pointer %p\n", data);
     if (allFramesRead) {
       printf("all frames read\n");
@@ -209,6 +218,8 @@ int main(int argc, char *argv[]) {
       // assert(data != NULL);
     }
   }
+
+  printf("Time taken:%lf\n", total_time/frame_count);
 
   // Free the RGB image
   av_free(buffer);
