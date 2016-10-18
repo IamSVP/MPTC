@@ -13,6 +13,7 @@
 #include <atomic>
 #include <typeinfo>
 #include <cassert>
+#include <iostream>
 
 
 
@@ -63,7 +64,48 @@ typedef struct _DecodeInfo {
 
   uint32_t max_compressed_ep_C, max_compressed_ep_Y;
   bool is_multi_thread;
-                                     // every time a new unique dictionary has to be read
+
+  _DecodeInfo() {
+    comp_palette = NULL; uncomp_palette = NULL;
+    comp_motion_indices = NULL; motion_indices = NULL;
+    comp_ep_Y = NULL; comp_ep_C = NULL;
+    comp_ep1_Y = NULL; comp_ep1_C = NULL; comp_ep2_Y = NULL; comp_ep2_C = NULL;
+    wav_ep1_Y = NULL; wav_ep1_C = NULL; wav_ep2_Y = NULL; wav_ep2_C = NULL;
+    ep1_Y = NULL; ep1_Co = NULL; ep1_Cg = NULL; ep2_Y = NULL; ep2_Co = NULL; ep2_Cg = NULL;
+
+    frame_height = 0; frame_width = 0; total_frame_count = 0;
+    unique_interval = 0; search_area = 0;
+    curr_idx = 0;
+    is_start = false; is_unique = false;
+  }
+
+  ~_DecodeInfo() {
+    std::cout << "desctructor called!" << std::endl;
+    if(comp_palette) delete comp_palette;
+    if(uncomp_palette) delete uncomp_palette;
+    if(comp_motion_indices) delete comp_motion_indices;
+    if(motion_indices) delete motion_indices;
+    if(comp_ep_Y) delete comp_ep_Y;
+    if(comp_ep_C) delete comp_ep_C;
+    if(comp_ep1_Y) delete comp_ep1_Y;
+    if(comp_ep1_C) delete comp_ep1_C;
+    if(comp_ep2_Y) delete comp_ep2_Y;
+    if(comp_ep2_C) delete comp_ep2_C;
+    if(wav_ep1_Y) delete wav_ep1_Y;
+    if(wav_ep1_C) delete wav_ep1_C;
+    if(wav_ep2_Y) delete wav_ep2_Y;
+    if(wav_ep2_C) delete wav_ep2_C;
+    if(ep1_Y) delete ep1_Y; if(ep1_Co) delete ep1_Co; if(ep1_Cg) delete ep1_Cg;
+    if(ep2_Y) delete ep2_Y; if(ep2_Co) delete ep2_Co; if(ep2_Cg) delete ep2_Cg;
+    comp_palette = NULL; uncomp_palette = NULL;
+    comp_motion_indices = NULL; motion_indices = NULL;
+    comp_ep_Y = NULL; comp_ep_C = NULL;
+    comp_ep1_Y = NULL; comp_ep1_C = NULL; comp_ep2_Y = NULL; comp_ep2_C = NULL;
+    wav_ep1_Y = NULL; wav_ep1_C = NULL; wav_ep2_Y = NULL; wav_ep2_C = NULL;
+    ep1_Y = NULL; ep1_Co = NULL; ep1_Cg = NULL; ep2_Y = NULL; ep2_Co = NULL; ep2_Cg = NULL;
+
+
+  }
 } MPTCDecodeInfo;
 
 
@@ -76,6 +118,33 @@ typedef struct _BufferStruct {
   uint8_t curr_dxt_idx; // points to the current dxt to be returned
   uint8_t curr_decode_idx; // points to the decode pointer to be filled in
   uint8_t prev_decode_idx;
+  _BufferStruct () {
+    ptr_decode_info = NULL;
+    curr_dxt = NULL; prev_dxt = NULL;
+    buffered_dxts = NULL;
+
+    buffer_sz = 0;
+    curr_dxt_idx = 0;
+    curr_decode_idx = 0;
+    prev_decode_idx = 0;
+  }
+
+
+  ~_BufferStruct() {
+
+    std::cout << "buffer struct destructor callled!" << std::endl;
+    if(ptr_decode_info) delete ptr_decode_info;
+
+    for(uint8_t idx = 0; idx < buffer_sz; idx++)
+      if(buffered_dxts[idx]) free(buffered_dxts[idx]);
+    if(buffered_dxts) free(buffered_dxts);
+
+    ptr_decode_info = NULL;
+    curr_dxt = NULL; prev_dxt = NULL;
+    buffered_dxts = NULL;
+
+
+  }
 
 } BufferStruct;
 

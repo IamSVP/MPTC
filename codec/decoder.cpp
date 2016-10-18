@@ -247,6 +247,7 @@ void ReconstructDXTFrame(uint32_t *unique_indices,
         int32_t ref_block_y = curr_block_y + motion_y;
 
         int32_t ref_physical_idx = ref_block_y * blocks_width + ref_block_x;
+	assert(physical_idx > ref_physical_idx);
 	curr_dxt[physical_idx].interp = curr_dxt[ref_physical_idx].interp;
     }
   }
@@ -262,6 +263,7 @@ int GetFrame(std::ifstream &in_stream, PhysicalDXTBlock *prev_dxt, PhysicalDXTBl
 
   if(in_stream.eof()) {
     std::cerr << "Error end of file reached, no more frames!" << std::endl;
+
     return -1;
   }
   // This is the start read all the frame meta data once and store it in the DecodeInfo for 
@@ -630,12 +632,12 @@ void GetFrameMultiThread(std::ifstream &in_stream,
 
    decode_info->curr_idx++;
 
-   if(decode_info->curr_frame >= decode_info->total_frame_count) {
-     in_stream.seekg(0, in_stream.beg);
-     in_stream.seekg(34);
-     decode_info->is_unique = true;
-     decode_info->curr_frame = 0;
-   }
+/*   if(decode_info->curr_frame >= decode_info->total_frame_count) {*/
+     //in_stream.seekg(0, in_stream.beg);
+     //in_stream.seekg(34);
+     //decode_info->is_unique = true;
+     //decode_info->curr_frame = 0;
+   //}
 
   return;
 }
@@ -653,9 +655,11 @@ int InitBufferedDecode(uint8_t buffer_sz,
   // Decode Info
   assert(2 < buffer_sz && buffer_sz < 20 && "!!Buffer Size too Big!!\n");
 
-  ptr_buffer_struct->ptr_decode_info = (MPTCDecodeInfo*)malloc(sizeof(MPTCDecodeInfo));
+  ptr_buffer_struct->ptr_decode_info = new MPTCDecodeInfo();
   ptr_buffer_struct->ptr_decode_info->is_start = true;
   ptr_buffer_struct->buffer_sz = buffer_sz; 
+
+  for(uint8_t idx = 0; idx < buffer_sz; idx++)
 
   ptr_buffer_struct->buffered_dxts = (PhysicalDXTBlock**)malloc(buffer_sz * sizeof(PhysicalDXTBlock*));
 

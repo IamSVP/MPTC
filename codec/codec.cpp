@@ -34,6 +34,12 @@
 //#define PALETTECOMP
 //#define ENDPOINTIMG
 //#define COMBINEPALETTE
+
+std::ofstream out_interp;
+uint32_t vIndices_bytes = 0;
+
+#define IndexData
+
 #define VID_CODEC_EP
 namespace MPTC {
 
@@ -1121,12 +1127,11 @@ void EntropyEncode(std::unique_ptr<MPTC::DXTImage> &dxt_frame, std::vector<uint8
   }
   arith_data_encoder.stop_encoder();
   indices_bytes = arith_data_encoder.get_num_bytes();
-
+  vIndices_bytes = indices_bytes;
 #ifndef NDEBUG
   std::cout << "compressed motion indices size: " << indices_bytes << std::endl;
 #endif
 
-  total_bytes = dxt_frame->_unique_palette.size() * 4 + indices_bytes;
 #ifndef NDEBUG
   std::cout << "Total bytes: " << total_bytes << std::endl;
 #endif
@@ -1308,7 +1313,8 @@ void CompressMultiUnique(const std::string dir_name, const std::string out_file,
     std::cerr<< "Error opening directory: " << dir_name << std::endl;
     exit(-1);
   }
-
+ 
+  out_interp.open("out.txt", std::ofstream::out);
   std::string first_file, curr_file, prev_file;
   struct dirent *entry = NULL;
   uint32_t frame_number = 0; 
@@ -1391,19 +1397,20 @@ void CompressMultiUnique(const std::string dir_name, const std::string out_file,
     std::cout << "Total blocks found: " << curr_frame->_motion_indices.size() << std::endl;
     std::cout << "Inter pixel blocks:" << curr_frame->_inter_pixel_motion_indices.size() << std::endl;
 #endif
+    out_interp << curr_frame->PSNR() << "\t";
+    
 
-
-  std::unique_ptr<RGBImage> ep1 = std::move(curr_frame->EndpointOneImage());
-  std::unique_ptr<RGBImage> ep2 = std::move(curr_frame->EndpointTwoImage());
-  size_t W = ep1->Width();
-  size_t H = ep1->Height();
-  std::string ep_file1, ep_file2;
-  ep_file1.clear();
-  ep_file2.clear();
-  ep_file1 = ep_dir + "/1/" + std::to_string(frame_number) + ".png";
-  ep_file2 = ep_dir + "/2/" + std::to_string(frame_number) + ".png";
-  stbi_write_png(ep_file1.c_str(), W, H, 3, ep1->Pack().data(), 3*W);
-  stbi_write_png(ep_file2.c_str(), W, H, 3, ep2->Pack().data(), 3*W);
+/*  std::unique_ptr<RGBImage> ep1 = std::move(curr_frame->EndpointOneImage());*/
+  //std::unique_ptr<RGBImage> ep2 = std::move(curr_frame->EndpointTwoImage());
+  //size_t W = ep1->Width();
+  //size_t H = ep1->Height();
+  //std::string ep_file1, ep_file2;
+  //ep_file1.clear();
+  //ep_file2.clear();
+  //ep_file1 = ep_dir + "/1/" + std::to_string(frame_number) + ".png";
+  //ep_file2 = ep_dir + "/2/" + std::to_string(frame_number) + ".png";
+  //stbi_write_png(ep_file1.c_str(), W, H, 3, ep1->Pack().data(), 3*W);
+  /*stbi_write_png(ep_file2.c_str(), W, H, 3, ep2->Pack().data(), 3*W);*/
   /*std::unique_ptr<RGB565Image> ep1 = std::move(curr_frame->EndpointOneValues());*/
   //std::unique_ptr<RGB565Image> ep2 = std::move(curr_frame->EndpointTwoValues());
   //size_t W = ep1->Width();
@@ -1488,6 +1495,8 @@ void CompressMultiUnique(const std::string dir_name, const std::string out_file,
        out_stream.write(reinterpret_cast<const char*>(compressed_combined_motion_data.data()), compressed_combined_motion_data.size());
        out_stream.flush();
        compressed_combined_motion_data.clear();
+       out_interp << vIndices_bytes << "\t" << compressed_combined_8bit_palette.size() << "\t";
+       out_interp << vIndices_bytes + compressed_combined_8bit_palette.size() << std::endl;
        compressed_combined_8bit_palette.clear(); 
        combined_8bit_palette.clear();
        unique_count = 0;
@@ -1571,8 +1580,8 @@ void SingleThreadCompressMulti(const std::string dir_name,
 #endif
 
     curr_frame->Reencode(prev_frame, -1);
-#ifndef NDEBUG
     std::cout << "PSNR after reencoding: " << curr_frame->PSNR() << std::endl;
+#ifndef NDEBUG
     std::cout << "Total blocks found: " << curr_frame->_motion_indices.size() << std::endl;
     std::cout << "Inter pixel blocks:" << curr_frame->_inter_pixel_motion_indices.size() << std::endl;
 #endif

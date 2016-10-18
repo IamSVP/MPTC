@@ -479,28 +479,28 @@ int main(int argc, char *argv[]) {
   //MPTC::CompressPNGStream(dir_path, out_file_path, search_area, vErrThreshold, interval, ep_dir);
   
   //MPTC::DecompressMPTCStream(out_file_path, out_dir, interval);
-  /*MPTC::CompressMultiUnique(dir_path, out_file_path, search_area, vErrThreshold, */
-                            /*intra_interval, unique_interval, ep_dir);*/
+  MPTC::CompressMultiUnique(dir_path, out_file_path, search_area, vErrThreshold, 
+                            intra_interval, unique_interval, ep_dir);
   //MPTC::DecompressMultiUnique(out_file_path, out_dir, ep_dir);
   //
   //
-  uint32_t wavelet_block_sz;
-  auto t1 = std::chrono::high_resolution_clock::now();
+/*  uint32_t wavelet_block_sz;*/
+  //auto t1 = std::chrono::high_resolution_clock::now();
 
-  MPTC::ThreadedCompressMultiUnique(dir_path,
-				    out_file_path,
-				    search_area,
-				    vErrThreshold,
-				    intra_interval,
-				    unique_interval,
-				    wavelet_block_sz,
-				    ep_dir,
-				    thread_count);
-   auto t2 = std::chrono::high_resolution_clock::now();
-   std::chrono::duration<double> fp_ms = t2 - t1;
-   std::cout << "Time:" << fp_ms.count() << std::endl;
+  //MPTC::ThreadedCompressMultiUnique(dir_path,
+				    //out_file_path,
+				    //search_area,
+				    //vErrThreshold,
+				    //intra_interval,
+				    //unique_interval,
+				    //wavelet_block_sz,
+				    //ep_dir,
+				    //thread_count);
+   //auto t2 = std::chrono::high_resolution_clock::now();
+   //std::chrono::duration<double> fp_ms = t2 - t1;
+   //std::cout << "Time:" << fp_ms.count() << std::endl;
 
-  //MPTC::DecompressMultiUnique(out_file_path, out_dir, ep_dir);
+  /*MPTC::DecompressMultiUnique(out_file_path, out_dir, ep_dir);*/
  
   return 0;
 }

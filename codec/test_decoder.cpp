@@ -2,6 +2,9 @@
 #include <fstream>
 #include <bitset>
 #include <chrono>
+#include <sstream>
+#include <iomanip>
+
 #include "decoder.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -150,20 +153,20 @@ int main(int argc, char *argv []) {
 
 
   MPTCDecodeInfo *decode_info;
-  decode_info = (MPTCDecodeInfo *)(malloc(sizeof(MPTCDecodeInfo)));
+  decode_info = new MPTCDecodeInfo();
   decode_info->is_start = true;
 
   std::vector<LogicalDXTBlock> logical_blocks; 
   std::vector<uint8_t> out_image;
 
-  BufferStruct *ptr_buffer_struct = (BufferStruct*)malloc(sizeof(BufferStruct)); 
+  BufferStruct *ptr_buffer_struct = new BufferStruct();
   InitBufferedDecode(4, ptr_buffer_struct, in_stream, num_blocks);
 
   assert(ptr_buffer_struct->ptr_decode_info != NULL);
   for(uint8_t idx = 0; idx < 4; idx++)
     assert(ptr_buffer_struct->buffered_dxts[idx] != NULL);
-
-  while(1) {
+  int frame_count = 0; 
+  while(frame_number < 20) {
 
    //GetFrameMultiThread(in_stream, prev_dxt, curr_dxt, decode_info);
    auto t1 = std::chrono::high_resolution_clock::now();
@@ -180,11 +183,18 @@ int main(int argc, char *argv []) {
      ////std::cout<< "IDX: " << i << "  " <<"Ep1: " << curr_dxt[i].ep1 << "  " << "Ep2: " << curr_dxt[i].ep2 << "  " << "Interp: " << x << std::endl;
      //int a = 10 + 20;
    /*}*/
+   std::ostringstream ss;
    frame_number++;
-   std::string out_file = out_dir + "/" + std::to_string(frame_number) + ".png";
+   ss.clear();
+   ss << std::setw(3) << std::setfill('0') << frame_number;
+   
+   std::string out_file = out_dir + "/" + ss.str() + ".png";
    stbi_write_png(out_file.c_str(), width, height, 3, out_image.data(), 3 * (width) );
 //#endif
  }
+
+  delete ptr_buffer_struct;
+  delete decode_info;
 
 
 }
